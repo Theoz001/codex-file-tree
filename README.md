@@ -42,7 +42,8 @@ manual install steps below.
 - CodeMirror-based source preview for common text formats
 - Collapsible sidebar and system light/dark theme support
 - Guarded write mode for editing existing text files
-- Context-menu file actions for copying paths, renaming, and moving items to trash
+- Context-menu file actions for copying paths, renaming, moving items to folders,
+  and moving items to trash
 - Local-only server bound to `127.0.0.1`
 
 ## Manual Install
@@ -89,7 +90,8 @@ http://127.0.0.1:8098/p/my-project/
 - Write mode must be enabled in the UI before mutating actions are available.
 - Mutating APIs require a per-process write token.
 - Save only writes existing text files under the preview size limit.
-- Rename and trash actions are limited to files and directories inside the root.
+- Rename, move, and trash actions are limited to files and directories inside the root.
+- Move refuses destination conflicts and prevents moving a directory into itself.
 - Protected paths such as `.git`, `node_modules`, `dist`, and `build` cannot be
   modified through write APIs.
 - Trash moves files to the platform trash location. Tests can override this with
@@ -109,6 +111,7 @@ Read APIs:
 - `GET /api/health`
 - `GET /api/meta`
 - `GET /api/tree?path=...`
+- `GET /api/folders`
 - `GET /api/file?path=...`
 - `GET /api/raw?path=...`
 
@@ -116,6 +119,7 @@ Write APIs:
 
 - `POST /api/file/save`
 - `POST /api/fs/rename`
+- `POST /api/fs/move`
 - `POST /api/fs/trash`
 
 Write APIs require the `x-project-preview-write-token` returned by

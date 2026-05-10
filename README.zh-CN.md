@@ -39,7 +39,7 @@ Open Project Preview for this workspace.
 - 使用 CodeMirror 预览常见文本格式
 - 可折叠侧边栏，并跟随系统明暗主题
 - 受保护的 Write mode，可编辑已有文本文件
-- 右键菜单支持复制路径、重命名、移入废纸篓
+- 右键菜单支持复制路径、重命名、移动到项目内文件夹、移入废纸篓
 - 本地服务只绑定 `127.0.0.1`
 
 ## 手动安装
@@ -86,8 +86,29 @@ http://127.0.0.1:8098/p/my-project/
 - 写操作需要先在界面中开启 Write mode
 - 写接口需要当前进程生成的 write token
 - 保存操作只写入已有文本文件，并受预览大小限制
-- 重命名和移入废纸篓只允许 root 内部的文件和目录
+- 重命名、移动和移入废纸篓只允许 root 内部的文件和目录
+- 移动操作会拒绝目标重名，并阻止把目录移动到自身内部
 - `.git`、`node_modules`、`dist`、`build` 等受保护路径不能通过写接口修改
+
+## API
+
+只读接口：
+
+- `GET /api/health`
+- `GET /api/meta`
+- `GET /api/tree?path=...`
+- `GET /api/folders`
+- `GET /api/file?path=...`
+- `GET /api/raw?path=...`
+
+写入接口：
+
+- `POST /api/file/save`
+- `POST /api/fs/rename`
+- `POST /api/fs/move`
+- `POST /api/fs/trash`
+
+写入接口需要 `GET /api/meta` 返回的 `x-project-preview-write-token`。
 
 ## 隐私
 
