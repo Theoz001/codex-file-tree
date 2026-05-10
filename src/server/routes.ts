@@ -33,7 +33,17 @@ interface RenameBody {
   newName: string;
 }
 
+interface MoveBody {
+  path: string;
+  targetDir: string;
+}
+
 interface TrashBody {
+  path: string;
+}
+
+interface FolderInfo {
+  name: string;
   path: string;
 }
 
@@ -71,6 +81,42 @@ function isAccessDenied(err: unknown): boolean {
 
 function isProtectedWritePath(safePath: string): boolean {
   return hasIgnoredSegment(safePath);
+}
+
+function isWithinRelativePath(candidatePath: string, parentPath: string): boolean {
+  const relative = path.relative(parentPath, candidatePath);
+  return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+async function getFolderList(rootDir: string): Promise<FolderInfo[]> {
+  const folders: FolderInfo[] = [{ name: path.basename(rootDir) || 'Project root', path: '' }];
+
+  async function walk(directoryPath: string) {
+    const entries = await fs.readdir(directoryPath, { withFileTypes: true });
+    const directories = entries
+      .filter(entry => entry.isDirectory() && !hasIgnoredSegment(entry.name))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const entry of directories) {
+      const fullPath = path.join(directoryPath, entry.name);
+      const relativePath = path.relative(rootDir, fullPath);
+      if (hasIgnoredSegment(relativePath)) continue;
+
+      try {
+        await assertExistingPathInsideRoot(fullPath, rootDir);
+        const stats = await fs.stat(fullPath);
+        if (!stats.isDirectory()) continue;
+        folders.push({ name: entry.name, path: relativePath });
+        await walk(fullPath);
+      } catch (err) {
+        if (isAccessDenied(err) || isErrno(err, 'ENOENT')) continue;
+        throw err;
+      }
+    }
+  }
+
+  await walk(rootDir);
+  return folders;
 }
 
 function encodeContentDispositionFilename(filename: string): string {
@@ -137,6 +183,20 @@ export async function registerRoutes(fastify: FastifyInstance, rootDir: string, 
 
       const tree = await getDirectoryTree(targetPath, rootDir);
       return reply.send({ path: safePath, nodes: tree });
+    } catch (err) {
+      const error = err as Error;
+      if (isAccessDenied(err)) {
+        return reply.status(403).send({ error: error.message });
+      }
+      return reply.status(500).send({ error: error.message });
+    }
+  });
+
+  // GET /api/folders
+  fastify.get('/api/folders', async (_request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const folders = await getFolderList(rootDir);
+      return reply.send({ folders });
     } catch (err) {
       const error = err as Error;
       if (isAccessDenied(err)) {
@@ -367,6 +427,78 @@ export async function registerRoutes(fastify: FastifyInstance, rootDir: string, 
       const error = err as Error;
       if (isErrno(err, 'ENOENT')) {
         return reply.status(404).send({ error: 'Source not found' });
+      }
+      if (isAccessDenied(err)) {
+        return reply.status(403).send({ error: error.message });
+      }
+      return reply.status(500).send({ error: error.message });
+    }
+  });
+
+  // POST /api/fs/move
+  fastify.post('/api/fs/move', async (request: FastifyRequest<{ Body: MoveBody }>, reply: FastifyReply) => {
+    if (!requireWriteToken(request, reply, writeToken)) {
+      return reply;
+    }
+
+    const rawPath = request.body.path || '';
+    const rawTargetDir = request.body.targetDir || '';
+    const safePath = sanitizePath(rawPath);
+    const safeTargetDir = sanitizePath(rawTargetDir);
+
+    if (!safePath) {
+      return reply.status(400).send({ error: 'Path is required' });
+    }
+
+    if (!isPathSafe(safePath, rootDir) || !isPathSafe(safeTargetDir, rootDir)) {
+      return reply.status(403).send({ error: 'Access denied: path is outside root directory' });
+    }
+
+    if (isProtectedWritePath(safePath) || isProtectedWritePath(safeTargetDir)) {
+      return reply.status(403).send({ error: 'Access denied: protected path cannot be modified' });
+    }
+
+    const sourcePath = path.join(rootDir, safePath);
+    const targetDirPath = path.join(rootDir, safeTargetDir);
+    const newPath = path.join(targetDirPath, path.basename(sourcePath));
+
+    try {
+      await assertExistingPathInsideRoot(sourcePath, rootDir);
+      await assertExistingPathInsideRoot(targetDirPath, rootDir);
+      await assertParentInsideRoot(newPath, rootDir);
+
+      const sourceStats = await fs.lstat(sourcePath);
+      if (!sourceStats.isFile() && !sourceStats.isDirectory()) {
+        return reply.status(400).send({ error: 'Only files and directories can be moved' });
+      }
+
+      const targetStats = await fs.stat(targetDirPath);
+      if (!targetStats.isDirectory()) {
+        return reply.status(400).send({ error: 'Target is not a directory' });
+      }
+
+      if (sourceStats.isDirectory() && isWithinRelativePath(path.resolve(targetDirPath), path.resolve(sourcePath))) {
+        return reply.status(400).send({ error: 'Cannot move a directory into itself' });
+      }
+
+      try {
+        await fs.lstat(newPath);
+        return reply.status(409).send({ error: 'Destination already exists' });
+      } catch (err) {
+        if (!isErrno(err, 'ENOENT')) {
+          throw err;
+        }
+      }
+
+      await fs.rename(sourcePath, newPath);
+      return reply.send({
+        success: true,
+        newPath: path.relative(rootDir, newPath),
+      });
+    } catch (err) {
+      const error = err as Error;
+      if (isErrno(err, 'ENOENT')) {
+        return reply.status(404).send({ error: 'Source or target not found' });
       }
       if (isAccessDenied(err)) {
         return reply.status(403).send({ error: error.message });
