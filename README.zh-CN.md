@@ -1,5 +1,10 @@
 # Project Preview
 
+> 🧭 **像内置文件树一样使用。** Project Preview 直接运行在 Codex App 的内置浏览器里，
+> 无需外部窗口，也不用切换上下文。
+
+![Project Preview 在 Codex App 内置浏览器中运行](assets/project-preview-screenshot.jpg)
+
 Project Preview 是一个本地 Codex 插件，用来在 Codex 内置浏览器中预览当前工作目录。
 
 [English README](README.md)
