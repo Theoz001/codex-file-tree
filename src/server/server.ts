@@ -6,7 +6,7 @@ import type { FastifyReply } from 'fastify';
 import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
-import { listInstances, projectSlug, projectUrl, removeInstance, saveInstance } from './process-manager.js';
+import { listInstances, projectRedirectUrl, projectSlug, projectUrl, removeInstance, saveInstance } from './process-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,7 +72,7 @@ export async function resolveProjectRedirect(
     .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
 
   const match = matches[0];
-  return match ? projectUrl(match.port, match.root) : null;
+  return match ? projectRedirectUrl(match.port, match.root) : null;
 }
 
 export async function createServer(rootDir: string, port: number, clientDist?: string) {

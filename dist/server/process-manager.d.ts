@@ -10,6 +10,7 @@ export interface InstanceWithStatus extends InstanceState {
 }
 export declare function projectSlug(root: string): string;
 export declare function projectUrl(port: number, root: string): string;
+export declare function projectRedirectUrl(port: number, root: string): string;
 export declare function saveInstance(root: string, port: number, pid: number): Promise<void>;
 export declare function getInstance(root: string): Promise<InstanceState | null>;
 export declare function removeInstance(root: string): Promise<void>;

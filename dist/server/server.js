@@ -5,7 +5,7 @@ import fastifyStatic from '@fastify/static';
 import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
-import { listInstances, projectSlug, projectUrl, removeInstance, saveInstance } from './process-manager.js';
+import { listInstances, projectRedirectUrl, projectSlug, projectUrl, removeInstance, saveInstance } from './process-manager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 function escapeHtml(value) {
@@ -58,7 +58,7 @@ export async function resolveProjectRedirect(requestUrl, rootDir, port) {
         && projectSlug(instance.root) === requestedSlug))
         .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
     const match = matches[0];
-    return match ? projectUrl(match.port, match.root) : null;
+    return match ? projectRedirectUrl(match.port, match.root) : null;
 }
 export async function createServer(rootDir, port, clientDist) {
     const writeToken = randomBytes(32).toString('base64url');

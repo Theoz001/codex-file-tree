@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isProcessAlive, projectSlug, projectUrl } from '../src/server/process-manager.js';
+import { isProcessAlive, projectRedirectUrl, projectSlug, projectUrl } from '../src/server/process-manager.js';
 
 function mockHealth(root: string) {
   vi.stubGlobal('fetch', vi.fn(async () => ({
@@ -17,6 +17,9 @@ describe('process manager', () => {
     expect(projectSlug('/tmp/My Project')).toBe('My-Project');
     expect(projectSlug('/tmp/project%20name')).toBe('project-20name');
     expect(projectUrl(8101, '/tmp/新业态治理国际比较')).toBe(
+      'http://127.0.0.1:8101/p/新业态治理国际比较/',
+    );
+    expect(projectRedirectUrl(8101, '/tmp/新业态治理国际比较')).toBe(
       `http://127.0.0.1:8101/p/${encodeURIComponent('新业态治理国际比较')}/`,
     );
   });

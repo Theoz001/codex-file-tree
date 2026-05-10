@@ -27,6 +27,10 @@ export function projectSlug(root: string): string {
 }
 
 export function projectUrl(port: number, root: string): string {
+  return `http://127.0.0.1:${port}/p/${projectSlug(root)}/`;
+}
+
+export function projectRedirectUrl(port: number, root: string): string {
   return `http://127.0.0.1:${port}/p/${encodeURIComponent(projectSlug(root))}/`;
 }
 

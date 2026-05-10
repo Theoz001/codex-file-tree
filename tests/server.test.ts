@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { createServer, getRequestedProjectSlug } from '../src/server/server.js';
-import { projectUrl, saveInstance } from '../src/server/process-manager.js';
+import { projectRedirectUrl, projectUrl, saveInstance } from '../src/server/process-manager.js';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -913,7 +913,7 @@ describe('SPA Routes', () => {
       });
 
       expect(response.statusCode).toBe(302);
-      expect(response.headers.location).toBe(projectUrl(8101, otherRoot));
+      expect(response.headers.location).toBe(projectRedirectUrl(8101, otherRoot));
     } finally {
       vi.unstubAllGlobals();
       await fs.rm(stateDir, { recursive: true, force: true });

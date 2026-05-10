@@ -11,6 +11,9 @@ export function projectSlug(root) {
     return name.trim().replace(/\s+/g, '-').replace(/[/?#%\\]/g, '-') || 'root';
 }
 export function projectUrl(port, root) {
+    return `http://127.0.0.1:${port}/p/${projectSlug(root)}/`;
+}
+export function projectRedirectUrl(port, root) {
     return `http://127.0.0.1:${port}/p/${encodeURIComponent(projectSlug(root))}/`;
 }
 function getInstanceId(root) {
