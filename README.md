@@ -8,6 +8,12 @@
 Project Preview is a local Codex plugin for browsing and previewing the current
 workspace in the Codex in-app browser.
 
+> 🐛 **Why this exists:** Project Preview was built as a practical workaround for
+> a Codex App file-tree visibility bug where `View > Toggle File Tree` can be
+> enabled but still fail to reveal a usable file tree. If that upstream issue is
+> fixed, this plugin may become much less necessary. See
+> [openai/codex#20552](https://github.com/openai/codex/issues/20552#issuecomment-4411037859).
+
 [中文说明](README.zh-CN.md)
 
 ## Quick Install With Codex
