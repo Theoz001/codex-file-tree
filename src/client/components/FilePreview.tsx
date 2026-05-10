@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { githubLight } from '@uiw/codemirror-theme-github';
 import { javascript } from '@codemirror/lang-javascript';
@@ -14,10 +14,32 @@ import type { FileInfo } from '../App';
 
 interface FilePreviewProps {
   file: FileInfo | null;
+  writeMode: boolean;
+  writeToken: string;
+  onFileSaved: () => void;
+  onFileRenamed: (oldPath: string, newPath: string) => void;
+  onFileTrashed: (path: string) => void;
 }
 
-const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
+const FilePreview: React.FC<FilePreviewProps> = ({
+  file,
+  writeMode,
+  writeToken,
+  onFileSaved,
+  onFileRenamed,
+  onFileTrashed,
+}) => {
   const [markdownSource, setMarkdownSource] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsEditing(false);
+    setEditedContent('');
+    setSaveError(null);
+  }, [file?.path]);
 
   if (!file) {
     return (
@@ -37,32 +59,136 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
     return new Date(iso).toLocaleString();
   };
 
-  const getLanguageExtension = (filename: string) => {
+  const getLanguageExtensions = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'js':
       case 'jsx':
       case 'ts':
       case 'tsx':
-        return javascript({ jsx: ext?.includes('x') });
+        return [javascript({ jsx: ext?.includes('x') })];
       case 'json':
-        return json();
+        return [json()];
       case 'md':
       case 'markdown':
-        return markdown();
+        return [markdown()];
       case 'py':
-        return python();
+        return [python()];
       case 'css':
       case 'scss':
       case 'sass':
-        return css();
+        return [css()];
       case 'html':
       case 'htm':
-        return html();
+        return [html()];
       default:
         return [];
     }
   };
+
+  const writeHeaders = () => ({
+    'Content-Type': 'application/json',
+    'X-Project-Preview-Write-Token': writeToken,
+  });
+
+  const handleEdit = () => {
+    if (file.content !== undefined) {
+      setIsEditing(true);
+      setEditedContent(file.content);
+      setSaveError(null);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setEditedContent('');
+    setSaveError(null);
+  };
+
+  const handleSave = async () => {
+    if (!file || !writeToken) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const response = await fetch('/api/file/save', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ path: file.path, content: editedContent }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Save failed' }));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      setIsEditing(false);
+      setEditedContent('');
+      onFileSaved();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRename = async () => {
+    if (!file || !writeToken || isEditing || isSaving) return;
+    const newName = window.prompt(`Rename "${file.name}" to:`, file.name);
+    if (!newName || newName === file.name) return;
+    try {
+      const response = await fetch('/api/fs/rename', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ path: file.path, newName }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Rename failed' }));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      const result = await response.json();
+      onFileRenamed(file.path, result.newPath);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Rename failed');
+    }
+  };
+
+  const handleTrash = async () => {
+    if (!file || !writeToken || isEditing || isSaving) return;
+    const confirmed = window.confirm(`Move "${file.path}" to Trash?`);
+    if (!confirmed) return;
+    try {
+      const response = await fetch('/api/fs/trash', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ path: file.path }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Trash failed' }));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      onFileTrashed(file.path);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Trash failed');
+    }
+  };
+
+  const handleCopyPath = async () => {
+    if (!file) return;
+    try {
+      await navigator.clipboard.writeText(file.absolutePath);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = file.absolutePath;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const canEdit = file.isText && !file.isLarge && file.content !== undefined;
+  const canWrite = writeMode && !!writeToken;
 
   const renderContent = () => {
     if (file.isLarge && file.isText) {
@@ -75,7 +201,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
       );
     }
 
-    if (file.mimeType === 'text/markdown' && file.content) {
+    if (file.mimeType === 'text/markdown' && file.content !== undefined) {
       return (
         <div>
           <div className="preview-actions" style={{ marginBottom: '12px' }}>
@@ -92,14 +218,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
               Source
             </button>
           </div>
-          {markdownSource ? (
+          {markdownSource || isEditing ? (
             <CodeMirror
-              value={file.content}
+              value={isEditing ? editedContent : file.content}
               theme={githubLight}
               extensions={[markdown()]}
-              editable={false}
+              editable={isEditing}
               basicSetup={{ lineNumbers: true }}
               style={{ fontSize: '13px' }}
+              onChange={isEditing ? setEditedContent : undefined}
             />
           ) : (
             <div className="markdown-body">
@@ -112,34 +239,49 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
       );
     }
 
-    if (file.mimeType === 'application/json' && file.content) {
+    if (file.mimeType === 'application/json' && file.content !== undefined) {
       try {
         const formatted = JSON.stringify(JSON.parse(file.content), null, 2);
         return (
           <CodeMirror
-            value={formatted}
+            value={isEditing ? editedContent : formatted}
             theme={githubLight}
             extensions={[json()]}
-            editable={false}
+            editable={isEditing}
             basicSetup={{ lineNumbers: true }}
             style={{ fontSize: '13px' }}
+            onChange={isEditing ? setEditedContent : undefined}
           />
         );
       } catch {
         return (
           <CodeMirror
-            value={file.content}
+            value={isEditing ? editedContent : file.content}
             theme={githubLight}
             extensions={[json()]}
-            editable={false}
+            editable={isEditing}
             basicSetup={{ lineNumbers: true }}
             style={{ fontSize: '13px' }}
+            onChange={isEditing ? setEditedContent : undefined}
           />
         );
       }
     }
 
-    if (file.mimeType === 'text/csv' && file.content) {
+    if (file.mimeType === 'text/csv' && file.content !== undefined) {
+      if (isEditing) {
+        return (
+          <CodeMirror
+            value={editedContent}
+            theme={githubLight}
+            extensions={[]}
+            editable={true}
+            basicSetup={{ lineNumbers: true }}
+            style={{ fontSize: '13px' }}
+            onChange={setEditedContent}
+          />
+        );
+      }
       const result = Papa.parse(file.content, { header: true });
       if (result.data && result.data.length > 0) {
         const headers = Object.keys(result.data[0] as Record<string, unknown>);
@@ -171,15 +313,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
       }
     }
 
-    if (file.isText && file.content) {
+    if (file.isText && file.content !== undefined) {
       return (
         <CodeMirror
-          value={file.content}
+          value={isEditing ? editedContent : file.content}
           theme={githubLight}
-          extensions={[getLanguageExtension(file.name)]}
-          editable={false}
+          extensions={getLanguageExtensions(file.name)}
+          editable={isEditing}
           basicSetup={{ lineNumbers: true }}
           style={{ fontSize: '13px' }}
+          onChange={isEditing ? setEditedContent : undefined}
         />
       );
     }
@@ -244,7 +387,46 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
             {formatSize(file.size)} • {formatDate(file.mtime)} • {file.mimeType}
           </div>
         </div>
+        <div className="preview-actions">
+          <button className="btn" onClick={handleCopyPath} title="Copy absolute path">
+            📋 Copy path
+          </button>
+          {canWrite && canEdit && !isEditing && (
+            <button className="btn" onClick={handleEdit}>
+              ✏️ Edit
+            </button>
+          )}
+          {canWrite && isEditing && (
+            <>
+              <button
+                className="btn btn-primary"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : '💾 Save'}
+              </button>
+              <button className="btn" onClick={handleCancel} disabled={isSaving}>
+                ❌ Cancel
+              </button>
+            </>
+          )}
+          {canWrite && !isEditing && (
+            <>
+              <button className="btn" onClick={handleRename} disabled={isSaving}>
+                ✏️ Rename
+              </button>
+              <button className="btn btn-danger" onClick={handleTrash} disabled={isSaving}>
+                🗑️ Trash
+              </button>
+            </>
+          )}
+        </div>
       </div>
+      {saveError && (
+        <div style={{ padding: '8px 16px', background: '#ffebee', color: '#c62828', fontSize: '13px' }}>
+          {saveError}
+        </div>
+      )}
       <div className="preview-content">{renderContent()}</div>
     </div>
   );

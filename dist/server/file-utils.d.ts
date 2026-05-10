@@ -9,6 +9,7 @@ export interface FileNode {
 export interface FileInfo {
     name: string;
     path: string;
+    absolutePath: string;
     size: number;
     mtime: string;
     mimeType: string;

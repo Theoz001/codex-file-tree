@@ -5,7 +5,7 @@ description: "Use when the user asks to open Project Preview, preview the curren
 
 # Project Preview
 
-一个轻量级的本地项目文件预览器，专为 Codex 的 in-app browser 设计。
+一个轻量级的本地项目文件预览器，专为 Codex 的 in-app browser 设计。它默认用于浏览和预览文件，也提供受保护的 Write mode 做有限文件操作。
 
 ## 触发词
 
@@ -18,15 +18,15 @@ description: "Use when the user asks to open Project Preview, preview the curren
 ## 功能定位
 
 - **不是 wiki**：不做知识库、不做双向链接、不做笔记管理
-- **不是 file manager**：不上传、不删除、不重命名、不编辑、不分享
+- **不是完整 file manager**：不上传、不分享、不跨 root 管理文件
 - **不是后台常驻服务**：按需启动，进程可复用，支持 stop/list 管理
-- **是只读文件预览器**：在浏览器里浏览当前工作目录的文件结构，查看文件内容
+- **是项目预览器**：在浏览器里浏览当前工作目录的文件结构，查看文件内容；Write mode 只支持受保护的文本保存、文件重命名和文件移入 Trash
 
 ## 工作流
 
 当用户触发时：
 
-不要分析目录、不要列文件、不要解释实现。只启动或复用本地只读预览服务，然后把 URL 给用户。
+不要分析目录、不要列文件、不要解释实现。只启动或复用本地预览服务，然后把 URL 给用户。
 
 1. **获取当前工作目录**（Codex 的 cwd）
 2. **优先调用 MCP tool**：`project_preview_open({ root: <cwd> })`
@@ -54,16 +54,19 @@ node dist/server/index.js list
 
 ## 安全边界
 
-### 只读原则
-- 所有 API 均为只读操作
-- 不提供任何写入、删除、修改文件的接口
+### 写操作边界
+- 默认使用浏览和预览；Write mode 由前端显式开启
+- 写接口要求 per-process write token
+- 保存只允许已有文本文件
+- 重命名和 Trash 只允许普通文件
+- `.git`, `node_modules`, `dist`, `build` 等 ignored/protected path 不允许被写接口修改
 - 不提供执行系统命令的能力
 
 ### 路径限制
 - 只能访问指定的 root 目录内的文件
 - `../` 路径穿越会被阻止
-- 绝对路径会被过滤为相对路径
-- Symlink 如果指向 root 外部，默认不允许访问
+- 绝对路径会被拒绝
+- Symlink 如果指向 root 外部，默认不允许访问；父目录 symlink 指向 root 外部也会被阻止
 
 ### 忽略目录
 默认忽略以下目录（不出现在文件树中）：
@@ -97,7 +100,7 @@ node dist/server/index.js list
 
 | 文件类型 | 预览方式 |
 |---------|---------|
-| 文本/代码 | CodeMirror 只读高亮 |
+| 文本/代码 | CodeMirror 高亮；Write mode 下可编辑文本文件 |
 | Markdown | 渲染预览 + 源码切换 |
 | JSON | 格式化显示 |
 | CSV | 表格预览（限制行数） |
@@ -169,7 +172,7 @@ npm run lint
 
 ## 注意事项
 
-- 第一版只做"插件启动本地 server + browser 打开 URL"
+- 插件职责是启动本地 server + browser 打开 URL
 - 如果当前 Codex runtime 支持 sessionStart hook，再考虑自动启动；否则不要强行做
 - 前端构建产物在 `dist/client/`，server 构建产物在 `dist/server/`
 - 启动前确保已运行 `npm run build`

@@ -144,7 +144,7 @@ def stop_preview(root_arg: str) -> dict[str, Any]:
 
 TOOLS: dict[str, dict[str, Any]] = {
     "project_preview_open": {
-        "description": "Start or reuse the read-only Project Preview web server for a Codex workspace and return its localhost URL. Do not inspect files or summarize the tree; just return/open the URL.",
+        "description": "Start or reuse the Project Preview web server for a Codex workspace and return its localhost URL. Do not inspect files or summarize the tree; just return/open the URL.",
         "inputSchema": {
             "type": "object",
             "properties": {

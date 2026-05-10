@@ -31,17 +31,19 @@ export const IGNORED_PATTERNS = [
 ];
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+export const WRITE_TOKEN_HEADER = 'x-project-preview-write-token';
+
+function isWithinRoot(candidatePath: string, rootPath: string): boolean {
+  const relative = path.relative(rootPath, candidatePath);
+  return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
 
 export function isPathSafe(requestedPath: string, rootDir: string): boolean {
   const resolvedPath = path.resolve(rootDir, requestedPath);
   const resolvedRoot = path.resolve(rootDir);
-  
+
   // Check if resolved path is within root
-  if (!resolvedPath.startsWith(resolvedRoot + path.sep) && resolvedPath !== resolvedRoot) {
-    return false;
-  }
-  
-  return true;
+  return isWithinRoot(resolvedPath, resolvedRoot);
 }
 
 export function shouldIgnore(name: string): boolean {
@@ -56,15 +58,13 @@ export function shouldIgnore(name: string): boolean {
 
 export async function isSymlinkSafe(filePath: string, rootDir: string): Promise<boolean> {
   try {
-    const stats = await fs.lstat(filePath);
-    if (stats.isSymbolicLink()) {
-      const target = await fs.readlink(filePath);
-      const resolvedTarget = path.resolve(path.dirname(filePath), target);
-      const resolvedRoot = path.resolve(rootDir);
-      return resolvedTarget.startsWith(resolvedRoot + path.sep) || resolvedTarget === resolvedRoot;
-    }
+    await assertExistingPathInsideRoot(filePath, rootDir);
     return true;
-  } catch {
+  } catch (err) {
+    // If the file doesn't exist, it's not an unsafe symlink
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return true;
+    }
     return false;
   }
 }
@@ -72,9 +72,53 @@ export async function isSymlinkSafe(filePath: string, rootDir: string): Promise<
 export function sanitizePath(inputPath: string): string {
   // Remove null bytes
   let sanitized = inputPath.replace(/\0/g, '');
+  if (!sanitized) {
+    return '';
+  }
   // Normalize path separators
   sanitized = path.normalize(sanitized);
-  // Remove leading path separators to prevent absolute path traversal
-  sanitized = sanitized.replace(/^[/\\]+/, '');
   return sanitized;
+}
+
+export function hasIgnoredSegment(requestedPath: string): boolean {
+  return requestedPath
+    .split(/[\\/]+/)
+    .filter(Boolean)
+    .some(segment => shouldIgnore(segment));
+}
+
+export async function assertExistingPathInsideRoot(filePath: string, rootDir: string): Promise<void> {
+  const resolvedPath = path.resolve(filePath);
+  const resolvedRoot = path.resolve(rootDir);
+
+  if (!isWithinRoot(resolvedPath, resolvedRoot)) {
+    throw Object.assign(new Error('Access denied: path is outside root directory'), { code: 'EACCES' });
+  }
+
+  const [realPath, realRoot] = await Promise.all([
+    fs.realpath(resolvedPath),
+    fs.realpath(resolvedRoot),
+  ]);
+
+  if (!isWithinRoot(realPath, realRoot)) {
+    throw Object.assign(new Error('Access denied: real path is outside root directory'), { code: 'EACCES' });
+  }
+}
+
+export async function assertParentInsideRoot(filePath: string, rootDir: string): Promise<void> {
+  const resolvedPath = path.resolve(filePath);
+  const resolvedRoot = path.resolve(rootDir);
+
+  if (!isWithinRoot(resolvedPath, resolvedRoot)) {
+    throw Object.assign(new Error('Access denied: path is outside root directory'), { code: 'EACCES' });
+  }
+
+  const [realParent, realRoot] = await Promise.all([
+    fs.realpath(path.dirname(resolvedPath)),
+    fs.realpath(resolvedRoot),
+  ]);
+
+  if (!isWithinRoot(realParent, realRoot)) {
+    throw Object.assign(new Error('Access denied: parent path is outside root directory'), { code: 'EACCES' });
+  }
 }
