@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import FileTree from './components/FileTree';
 import FilePreview from './components/FilePreview';
 
@@ -35,6 +35,17 @@ interface RenameTarget {
   name: string;
 }
 
+interface MoveTarget {
+  path: string;
+  name: string;
+  type: 'file' | 'directory';
+}
+
+interface FolderInfo {
+  name: string;
+  path: string;
+}
+
 const MIN_SIDEBAR_WIDTH = 220;
 const MIN_PREVIEW_WIDTH = 240;
 const MAX_SIDEBAR_RATIO = 0.65;
@@ -46,6 +57,15 @@ function joinProjectPath(root: string, relativePath: string): string {
   if (!root) return relativePath;
   if (!relativePath) return root;
   return `${root.replace(/\/+$/, '')}/${relativePath}`;
+}
+
+function getParentPath(filePath: string): string {
+  const index = filePath.lastIndexOf('/');
+  return index === -1 ? '' : filePath.slice(0, index);
+}
+
+function isSameOrChildPath(candidatePath: string, parentPath: string): boolean {
+  return candidatePath === parentPath || candidatePath.startsWith(`${parentPath}/`);
 }
 
 function getSidebarBounds() {
@@ -87,9 +107,17 @@ const App: React.FC = () => {
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
+  const [folders, setFolders] = useState<FolderInfo[]>([]);
+  const [folderQuery, setFolderQuery] = useState('');
+  const [selectedMoveDir, setSelectedMoveDir] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const moveSearchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     localStorage.setItem('writeMode', String(writeMode));
@@ -109,6 +137,13 @@ const App: React.FC = () => {
       renameInputRef.current?.select();
     });
   }, [renameTarget]);
+
+  useEffect(() => {
+    if (!moveTarget) return;
+    requestAnimationFrame(() => {
+      moveSearchRef.current?.focus();
+    });
+  }, [moveTarget]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -235,6 +270,16 @@ const App: React.FC = () => {
     }
   }, [fetchTree, fetchFile, selectedFile]);
 
+  const handleFileMoved = useCallback((oldPath: string, newPath: string) => {
+    setTreeKey(prev => prev + 1);
+    fetchTree('');
+    if (selectedFile?.path === oldPath) {
+      fetchFile(newPath);
+    } else if (selectedFile?.path.startsWith(`${oldPath}/`)) {
+      fetchFile(`${newPath}${selectedFile.path.slice(oldPath.length)}`);
+    }
+  }, [fetchTree, fetchFile, selectedFile]);
+
   const handleFileTrashed = useCallback((trashedPath: string) => {
     setTreeKey(prev => prev + 1);
     fetchTree('');
@@ -323,6 +368,102 @@ const App: React.FC = () => {
     writeHeaders,
   ]);
 
+  const fetchFolders = useCallback(async () => {
+    setFoldersLoading(true);
+    setMoveError(null);
+    try {
+      const response = await fetch('/api/folders');
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Failed to load folders' }));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setFolders(data.folders || []);
+    } catch (err) {
+      setMoveError(err instanceof Error ? err.message : 'Failed to load folders');
+      setFolders([]);
+    } finally {
+      setFoldersLoading(false);
+    }
+  }, []);
+
+  const handleMovePath = useCallback((node: MoveTarget) => {
+    if (!projectMeta?.writeToken) return;
+    setMoveTarget(node);
+    setFolderQuery('');
+    setSelectedMoveDir(null);
+    setMoveError(null);
+    void fetchFolders();
+  }, [fetchFolders, projectMeta?.writeToken]);
+
+  const handleCancelMove = useCallback(() => {
+    if (isMoving) return;
+    setMoveTarget(null);
+    setFolderQuery('');
+    setSelectedMoveDir(null);
+    setMoveError(null);
+  }, [isMoving]);
+
+  const availableMoveFolders = useMemo(() => {
+    if (!moveTarget) return [];
+    const parentPath = getParentPath(moveTarget.path);
+    const query = folderQuery.trim().toLowerCase();
+
+    return folders.filter(folder => {
+      if (folder.path === parentPath) return false;
+      if (moveTarget.type === 'directory' && isSameOrChildPath(folder.path, moveTarget.path)) return false;
+      if (!query) return true;
+      const label = folder.path || '/';
+      return label.toLowerCase().includes(query);
+    });
+  }, [folderQuery, folders, moveTarget]);
+
+  useEffect(() => {
+    if (!moveTarget) return;
+    if (availableMoveFolders.length === 0) {
+      setSelectedMoveDir(null);
+      return;
+    }
+    if (!availableMoveFolders.some(folder => folder.path === selectedMoveDir)) {
+      setSelectedMoveDir(availableMoveFolders[0].path);
+    }
+  }, [availableMoveFolders, moveTarget, selectedMoveDir]);
+
+  const handleSubmitMove = useCallback(async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (!moveTarget || !projectMeta?.writeToken || isMoving || selectedMoveDir === null) return;
+
+    setIsMoving(true);
+    setMoveError(null);
+    try {
+      const response = await fetch('/api/fs/move', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ path: moveTarget.path, targetDir: selectedMoveDir }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Move failed' }));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      const result = await response.json();
+      handleFileMoved(moveTarget.path, result.newPath);
+      setMoveTarget(null);
+      setFolderQuery('');
+      setSelectedMoveDir(null);
+    } catch (err) {
+      setMoveError(err instanceof Error ? err.message : 'Move failed');
+    } finally {
+      setIsMoving(false);
+    }
+  }, [
+    handleFileMoved,
+    isMoving,
+    moveTarget,
+    projectMeta?.writeToken,
+    selectedMoveDir,
+    writeHeaders,
+  ]);
+
   const handleTrashPath = useCallback(async (path: string, name: string) => {
     if (!projectMeta?.writeToken) return;
     const confirmed = window.confirm(`Move "${path || name}" to Trash?`);
@@ -350,6 +491,10 @@ const App: React.FC = () => {
   const handleTrashNode = useCallback((node: FileNode) => {
     void handleTrashPath(node.path, node.name);
   }, [handleTrashPath]);
+
+  const handleMoveNode = useCallback((node: FileNode) => {
+    handleMovePath(node);
+  }, [handleMovePath]);
 
   const filteredTree = searchQuery
     ? treeData.filter(node =>
@@ -444,6 +589,7 @@ const App: React.FC = () => {
                   canWrite={writeMode && !!projectMeta?.writeToken}
                   onCopyPath={handleCopyPath}
                   onRename={handleRenameNode}
+                  onMove={handleMoveNode}
                   onTrash={handleTrashNode}
                 />
               </div>
@@ -462,6 +608,7 @@ const App: React.FC = () => {
             onFileSaved={handleFileSaved}
             onCopyPath={handleCopyPath}
             onRename={(file) => void handleRenamePath(file.path, file.name)}
+            onMove={(file) => void handleMovePath({ path: file.path, name: file.name, type: 'file' })}
             onTrash={(file) => void handleTrashPath(file.path, file.name)}
           />
         </main>
@@ -500,6 +647,70 @@ const App: React.FC = () => {
               </button>
               <button className="btn btn-primary" type="submit" disabled={isRenaming}>
                 {isRenaming ? 'Renaming...' : 'Rename'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {moveTarget && (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onMouseDown={handleCancelMove}
+        >
+          <form
+            className="move-dialog"
+            onSubmit={handleSubmitMove}
+            onMouseDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                handleCancelMove();
+              }
+            }}
+          >
+            <div className="dialog-title">Move "{moveTarget.name}" to folder</div>
+            <label className="dialog-field">
+              <span className="dialog-label">Search folders</span>
+              <input
+                ref={moveSearchRef}
+                value={folderQuery}
+                disabled={isMoving}
+                placeholder="Type to filter folders"
+                onChange={(event) => setFolderQuery(event.target.value)}
+              />
+            </label>
+            <div className="folder-list" role="listbox" aria-label="Destination folder">
+              {foldersLoading && <div className="folder-list-status">Loading folders...</div>}
+              {!foldersLoading && availableMoveFolders.length === 0 && (
+                <div className="folder-list-status">No available target folders</div>
+              )}
+              {!foldersLoading && availableMoveFolders.map(folder => (
+                <button
+                  key={folder.path || '__root__'}
+                  className={`folder-option ${selectedMoveDir === folder.path ? 'selected' : ''}`}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedMoveDir === folder.path}
+                  disabled={isMoving}
+                  onClick={() => setSelectedMoveDir(folder.path)}
+                >
+                  <span className="folder-option-icon">📁</span>
+                  <span className="folder-option-path">{folder.path || '/'}</span>
+                </button>
+              ))}
+            </div>
+            {moveError && <div className="dialog-error">{moveError}</div>}
+            <div className="dialog-actions">
+              <button className="btn" type="button" onClick={handleCancelMove} disabled={isMoving}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                type="submit"
+                disabled={isMoving || foldersLoading || selectedMoveDir === null}
+              >
+                {isMoving ? 'Moving...' : 'Move'}
               </button>
             </div>
           </form>

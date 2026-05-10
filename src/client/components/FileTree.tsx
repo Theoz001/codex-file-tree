@@ -9,6 +9,7 @@ interface FileTreeProps {
   canWrite?: boolean;
   onCopyPath?: (node: FileNode) => void;
   onRename?: (node: FileNode) => void;
+  onMove?: (node: FileNode) => void;
   onTrash?: (node: FileNode) => void;
 }
 
@@ -26,6 +27,7 @@ const FileTree: React.FC<FileTreeProps> = ({
   canWrite = false,
   onCopyPath,
   onRename,
+  onMove,
   onTrash,
 }) => {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
@@ -191,6 +193,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                   canWrite={canWrite}
                   onCopyPath={onCopyPath}
                   onRename={onRename}
+                  onMove={onMove}
                   onTrash={onTrash}
                 />
               )}
@@ -212,6 +215,11 @@ const FileTree: React.FC<FileTreeProps> = ({
           {canWrite && onRename && (
             <button type="button" onClick={() => runMenuAction(() => onRename(contextMenu.node))}>
               Rename
+            </button>
+          )}
+          {canWrite && onMove && (
+            <button type="button" onClick={() => runMenuAction(() => onMove(contextMenu.node))}>
+              Move to...
             </button>
           )}
           {canWrite && onTrash && (

@@ -19,6 +19,7 @@ interface FilePreviewProps {
   onFileSaved: () => void;
   onCopyPath: (file: FileInfo) => void;
   onRename: (file: FileInfo) => void;
+  onMove: (file: FileInfo) => void;
   onTrash: (file: FileInfo) => void;
 }
 
@@ -29,6 +30,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   onFileSaved,
   onCopyPath,
   onRename,
+  onMove,
   onTrash,
 }) => {
   const [markdownSource, setMarkdownSource] = useState(false);
@@ -422,6 +424,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                     onClick={() => { setActionsOpen(false); onRename(file); }}
                   >
                     Rename
+                  </button>
+                )}
+                {canWrite && !isEditing && (
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => { setActionsOpen(false); onMove(file); }}
+                  >
+                    Move to...
                   </button>
                 )}
                 {canWrite && !isEditing && (

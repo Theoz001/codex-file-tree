@@ -218,6 +218,25 @@ describe('Tree API', () => {
   });
 });
 
+describe('Folders API', () => {
+  it('should return safe project folders', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/folders',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const data = JSON.parse(response.payload);
+    const paths = data.folders.map((folder: { path: string }) => folder.path);
+
+    expect(paths).toContain('');
+    expect(paths).toContain('subdir');
+    expect(paths).not.toContain('node_modules');
+    expect(paths).not.toContain('.git');
+    expect(paths).not.toContain('outside-dir-link');
+  });
+});
+
 describe('File API', () => {
   it('should read text file content', async () => {
     const response = await app.inject({
@@ -548,6 +567,143 @@ describe('Rename API', () => {
       url: '/api/fs/rename',
       headers: writeHeaders(),
       payload: { path: 'outside-dir-link/secret.txt', newName: 'renamed.txt' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    await expect(fs.readFile(path.join(outsideDir, 'secret.txt'), 'utf-8')).resolves.toBe('outside secret');
+  });
+});
+
+describe('Move API', () => {
+  it('should move a file into a directory', async () => {
+    await fs.writeFile(path.join(testDir, 'move-me.txt'), 'move me');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: 'move-me.txt', targetDir: 'subdir' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const data = JSON.parse(response.payload);
+    expect(data.success).toBe(true);
+    expect(data.newPath).toBe(path.join('subdir', 'move-me.txt'));
+
+    await expect(fs.access(path.join(testDir, 'move-me.txt'))).rejects.toThrow();
+    await expect(fs.readFile(path.join(testDir, 'subdir', 'move-me.txt'), 'utf-8')).resolves.toBe('move me');
+
+    await fs.unlink(path.join(testDir, 'subdir', 'move-me.txt'));
+  });
+
+  it('should move a file to the project root', async () => {
+    await fs.writeFile(path.join(testDir, 'subdir', 'move-root.txt'), 'move root');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: 'subdir/move-root.txt', targetDir: '' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const data = JSON.parse(response.payload);
+    expect(data.success).toBe(true);
+    expect(data.newPath).toBe('move-root.txt');
+
+    await expect(fs.access(path.join(testDir, 'subdir', 'move-root.txt'))).rejects.toThrow();
+    await expect(fs.readFile(path.join(testDir, 'move-root.txt'), 'utf-8')).resolves.toBe('move root');
+
+    await fs.unlink(path.join(testDir, 'move-root.txt'));
+  });
+
+  it('should move a directory into another directory', async () => {
+    await fs.mkdir(path.join(testDir, 'move-dir'), { recursive: true });
+    await fs.mkdir(path.join(testDir, 'move-target'), { recursive: true });
+    await fs.writeFile(path.join(testDir, 'move-dir', 'file.txt'), 'inside');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: 'move-dir', targetDir: 'move-target' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const data = JSON.parse(response.payload);
+    expect(data.success).toBe(true);
+    expect(data.newPath).toBe(path.join('move-target', 'move-dir'));
+
+    await expect(fs.access(path.join(testDir, 'move-dir'))).rejects.toThrow();
+    await expect(fs.readFile(path.join(testDir, 'move-target', 'move-dir', 'file.txt'), 'utf-8')).resolves.toBe('inside');
+
+    await fs.rm(path.join(testDir, 'move-target'), { recursive: true, force: true });
+  });
+
+  it('should reject moving when destination already exists', async () => {
+    await fs.writeFile(path.join(testDir, 'move-conflict.txt'), 'source');
+    await fs.writeFile(path.join(testDir, 'subdir', 'move-conflict.txt'), 'target');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: 'move-conflict.txt', targetDir: 'subdir' },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(JSON.parse(response.payload).error).toContain('already exists');
+    await expect(fs.readFile(path.join(testDir, 'move-conflict.txt'), 'utf-8')).resolves.toBe('source');
+    await expect(fs.readFile(path.join(testDir, 'subdir', 'move-conflict.txt'), 'utf-8')).resolves.toBe('target');
+
+    await fs.unlink(path.join(testDir, 'move-conflict.txt'));
+    await fs.unlink(path.join(testDir, 'subdir', 'move-conflict.txt'));
+  });
+
+  it('should reject moving a directory into itself', async () => {
+    await fs.mkdir(path.join(testDir, 'loop-dir', 'child'), { recursive: true });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: 'loop-dir', targetDir: 'loop-dir/child' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.payload).error).toContain('itself');
+
+    await fs.rm(path.join(testDir, 'loop-dir'), { recursive: true, force: true });
+  });
+
+  it('should reject moving protected paths or targets', async () => {
+    await fs.writeFile(path.join(testDir, 'move-protected.txt'), 'protected');
+
+    const protectedSource = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: '.git/config', targetDir: 'subdir' },
+    });
+    const protectedTarget = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: 'move-protected.txt', targetDir: 'node_modules' },
+    });
+
+    expect(protectedSource.statusCode).toBe(403);
+    expect(protectedTarget.statusCode).toBe(403);
+
+    await fs.unlink(path.join(testDir, 'move-protected.txt'));
+  });
+
+  it('should reject moving through a symlinked parent directory', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/move',
+      headers: writeHeaders(),
+      payload: { path: 'outside-dir-link/secret.txt', targetDir: 'subdir' },
     });
 
     expect(response.statusCode).toBe(403);
