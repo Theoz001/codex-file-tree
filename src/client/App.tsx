@@ -619,7 +619,7 @@ const App: React.FC = () => {
                     >
                       <span className="preview-link-main">
                         <span className="preview-link-name">{preview.name}</span>
-                        {preview.current && <span className="preview-badge">Current</span>}
+                        {preview.current && <span className="preview-badge">This page</span>}
                       </span>
                       <span className="preview-link-meta">
                         localhost:{preview.port} · {preview.root}

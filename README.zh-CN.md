@@ -55,6 +55,20 @@ npm run build
 作为 Codex 插件使用时，把这个仓库安装或链接为本地插件，然后重载 Codex，让
 `project-preview` 插件被发现。
 
+## 更新
+
+如果你是本地 clone 这个仓库，更新时执行：
+
+```bash
+cd /path/to/codex-file-tree
+git pull
+npm install
+npm run build
+```
+
+然后重载或重启 Codex，让本地插件缓存刷新。如果 Codex 仍然打开旧版本，
+重新从这个目录安装或重新 link 本地插件。
+
 ## 使用
 
 为当前目录启动或复用预览服务：

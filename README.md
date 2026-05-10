@@ -59,6 +59,21 @@ npm run build
 For Codex plugin use, install or link this repository as a local plugin, then
 reload Codex so the `project-preview` plugin is discovered.
 
+## Update
+
+If you cloned this repository locally, update it with:
+
+```bash
+cd /path/to/codex-file-tree
+git pull
+npm install
+npm run build
+```
+
+Then reload or restart Codex so the local plugin cache is refreshed. If Codex
+still opens an older build, reinstall or relink the local plugin from this
+directory.
+
 ## Use
 
 Start or reuse a preview server for the current directory:
