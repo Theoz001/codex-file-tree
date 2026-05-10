@@ -4,13 +4,13 @@
   "description": "Lightweight local project file preview server for in-app browser",
   "main": "dist/server/index.js",
   "type": "module",
-  "homepage": "https://github.com/Ruczhutao/codex-file-tree#readme",
+  "homepage": "https://github.com/Theoz001/codex-file-tree#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Ruczhutao/codex-file-tree.git"
+    "url": "git+https://github.com/Theoz001/codex-file-tree.git"
   },
   "bugs": {
-    "url": "https://github.com/Ruczhutao/codex-file-tree/issues"
+    "url": "https://github.com/Theoz001/codex-file-tree/issues"
   },
   "bin": {
     "project-preview": "./dist/server/index.js"
@@ -31,7 +31,7 @@
     "browser",
     "local"
   ],
-  "author": "Zhutao",
+  "author": "Theoz",
   "license": "MIT",
   "dependencies": {
     "@codemirror/lang-css": "^6.3.0",

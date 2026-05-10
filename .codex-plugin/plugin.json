@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Lightweight local project file previewer for Codex in-app browser",
   "author": {
-    "name": "Zhutao"
+    "name": "Theoz"
   },
-  "homepage": "https://github.com/Ruczhutao/codex-file-tree",
-  "repository": "https://github.com/Ruczhutao/codex-file-tree",
+  "homepage": "https://github.com/Theoz001/codex-file-tree",
+  "repository": "https://github.com/Theoz001/codex-file-tree",
   "license": "MIT",
   "keywords": [
     "project-preview",
@@ -19,16 +19,16 @@
     "displayName": "Project Preview",
     "shortDescription": "Local browser preview for the current workspace",
     "longDescription": "Project Preview starts or reuses a local project file preview server bound to 127.0.0.1 and rooted at the current Codex working directory.",
-    "developerName": "Zhutao",
+    "developerName": "Theoz",
     "category": "Productivity",
     "capabilities": [
       "Interactive",
       "Read",
       "Tools"
     ],
-    "websiteURL": "https://github.com/Ruczhutao/codex-file-tree",
-    "privacyPolicyURL": "https://github.com/Ruczhutao/codex-file-tree#privacy",
-    "termsOfServiceURL": "https://github.com/Ruczhutao/codex-file-tree/blob/main/LICENSE",
+    "websiteURL": "https://github.com/Theoz001/codex-file-tree",
+    "privacyPolicyURL": "https://github.com/Theoz001/codex-file-tree#privacy",
+    "termsOfServiceURL": "https://github.com/Theoz001/codex-file-tree/blob/main/LICENSE",
     "defaultPrompt": [
       "打开项目预览",
       "预览当前项目文件",

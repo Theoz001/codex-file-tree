@@ -22,7 +22,7 @@ workspace in the Codex in-app browser.
 Open Codex and paste this request:
 
 ```text
-Install Project Preview from https://github.com/Ruczhutao/codex-file-tree as a local Codex plugin. Read the repository README first, then clone it, install dependencies, run npm run build, link or install it as a local plugin, reload plugins if needed, and open Project Preview for my current workspace.
+Install Project Preview from https://github.com/Theoz001/codex-file-tree as a local Codex plugin. Read the repository README first, then clone it, install dependencies, run npm run build, link or install it as a local plugin, reload plugins if needed, and open Project Preview for my current workspace.
 ```
 
 After installation, you can ask Codex:
@@ -49,7 +49,7 @@ manual install steps below.
 ## Manual Install
 
 ```bash
-git clone https://github.com/Ruczhutao/codex-file-tree.git
+git clone https://github.com/Theoz001/codex-file-tree.git
 cd codex-file-tree
 npm install
 npm run build
