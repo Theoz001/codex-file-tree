@@ -1,5 +1,10 @@
 # Project Preview
 
+> 🧭 **A native-feeling file tree for Codex.** Project Preview runs inside the
+> Codex App built-in browser, with no external window and no context switch.
+
+![Project Preview running inside Codex App](assets/project-preview-screenshot.jpg)
+
 Project Preview is a local Codex plugin for browsing and previewing the current
 workspace in the Codex in-app browser.
 
