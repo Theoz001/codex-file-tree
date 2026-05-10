@@ -177,11 +177,11 @@ Examples:
   project-preview list
 
 Security:
-  - Read-only access
   - Restricted to root directory
   - Symlinks outside root are blocked
-  - Ignores: .git, node_modules, dist, build, etc.
-`);
+  - Mutating APIs require a per-process write token
+  - Mutating APIs reject ignored paths: .git, node_modules, dist, build, etc.
+	`);
 }
 async function main() {
     const { command, root, port } = parseArgs();

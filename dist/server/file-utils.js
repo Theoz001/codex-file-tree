@@ -55,6 +55,7 @@ export async function getFileInfo(filePath, rootDir) {
     return {
         name,
         path: relativePath,
+        absolutePath: filePath,
         size: stats.size,
         mtime: stats.mtime.toISOString(),
         mimeType,

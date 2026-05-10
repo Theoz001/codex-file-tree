@@ -14,6 +14,7 @@ export interface FileNode {
 export interface FileInfo {
   name: string;
   path: string;
+  absolutePath: string;
   size: number;
   mtime: string;
   mimeType: string;
@@ -84,6 +85,7 @@ export async function getFileInfo(filePath: string, rootDir: string): Promise<Fi
   return {
     name,
     path: relativePath,
+    absolutePath: filePath,
     size: stats.size,
     mtime: stats.mtime.toISOString(),
     mimeType,

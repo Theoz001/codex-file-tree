@@ -22,7 +22,6 @@
   "dependencies": {
     "fastify": "^4.28.1",
     "@fastify/static": "^7.0.4",
-    "@fastify/cors": "^9.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "@codemirror/lang-javascript": "^6.2.2",

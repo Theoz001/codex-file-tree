@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
-import fastifyCors from '@fastify/cors';
+import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
 import { saveInstance, removeInstance } from './process-manager.js';
@@ -27,17 +27,14 @@ async function renderIndexHtml(staticRoot: string, rootDir: string): Promise<str
 }
 
 export async function createServer(rootDir: string, port: number, clientDist?: string) {
+  const writeToken = randomBytes(32).toString('base64url');
   const app = fastify({
     logger: {
       level: 'info',
     },
+    bodyLimit: 5 * 1024 * 1024 + 1024, // 5MB + buffer for save API validation
   });
-  
-  // Enable CORS
-  await app.register(fastifyCors, {
-    origin: true,
-  });
-  
+
   // Health check endpoint
   app.get('/api/health', async () => {
     return { status: 'ok', root: rootDir };
@@ -48,11 +45,12 @@ export async function createServer(rootDir: string, port: number, clientDist?: s
       name: path.basename(rootDir) || rootDir,
       root: rootDir,
       port,
+      writeToken,
     };
   });
   
   // Register API routes
-  await registerRoutes(app, rootDir);
+  await registerRoutes(app, rootDir, writeToken);
   
   // Serve static files (built client)
   const staticRoot = clientDist || path.resolve(__dirname, '../client');
