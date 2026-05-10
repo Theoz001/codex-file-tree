@@ -6,6 +6,11 @@ import { fileURLToPath } from 'url';
 import { startServer } from './server.js';
 import { getInstance, removeInstance, listInstances, isProcessAlive, cleanupDeadInstances } from './process-manager.js';
 const __filename = fileURLToPath(import.meta.url);
+function projectUrl(port, root) {
+    const name = path.basename(root) || 'root';
+    const slug = name.trim().replace(/\s+/g, '-').replace(/[/?#%\\]/g, '-') || 'root';
+    return `http://127.0.0.1:${port}/p/${slug}/`;
+}
 function parseArgs() {
     const args = process.argv.slice(2);
     let command = 'start';
@@ -43,7 +48,7 @@ async function handleStart(root, port) {
         const alive = await isProcessAlive(existing.pid, existing.port);
         if (alive) {
             console.log(`Preview server already running for ${root}`);
-            console.log(`URL: http://127.0.0.1:${existing.port}`);
+            console.log(`URL: ${projectUrl(existing.port, root)}`);
             return;
         }
         else {
@@ -63,7 +68,7 @@ async function handleUrl(root, port) {
     if (existing) {
         const alive = await isProcessAlive(existing.pid, existing.port);
         if (alive) {
-            console.log(`http://127.0.0.1:${existing.port}`);
+            console.log(projectUrl(existing.port, root));
             return;
         }
         await removeInstance(root);
@@ -81,7 +86,7 @@ async function handleUrl(root, port) {
         if (instance) {
             const alive = await isProcessAlive(instance.pid, instance.port);
             if (alive) {
-                console.log(`http://127.0.0.1:${instance.port}`);
+                console.log(projectUrl(instance.port, root));
                 return;
             }
         }
@@ -137,7 +142,7 @@ async function handleList() {
     for (const instance of instances) {
         const status = instance.alive ? '🟢 running' : '🔴 dead';
         console.log(`  ${status}  ${instance.root}`);
-        console.log(`      URL: http://127.0.0.1:${instance.port}`);
+        console.log(`      URL: ${projectUrl(instance.port, instance.root)}`);
         console.log(`      PID: ${instance.pid}  Started: ${instance.startedAt}`);
         console.log('');
     }

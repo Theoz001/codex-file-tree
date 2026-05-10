@@ -5,8 +5,8 @@
   "author": {
     "name": "Zhutao"
   },
-  "homepage": "https://github.com/filebrowser/filebrowser",
-  "repository": "",
+  "homepage": "https://github.com/Ruczhutao/codex-file-tree",
+  "repository": "https://github.com/Ruczhutao/codex-file-tree",
   "license": "MIT",
   "keywords": [
     "project-preview",
@@ -35,6 +35,8 @@
       "打开文件树"
     ],
     "brandColor": "#2563EB",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png",
     "screenshots": []
   },
   "mcpServers": "./.mcp.json"

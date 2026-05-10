@@ -35,7 +35,7 @@ beforeAll(async () => {
   // Create a mock client dist directory with index.html for SPA tests
   const mockClientDist = path.join(testDir, 'client');
   await fs.mkdir(mockClientDist, { recursive: true });
-  await fs.writeFile(path.join(mockClientDist, 'index.html'), '<!DOCTYPE html><html><body>Project Preview</body></html>');
+  await fs.writeFile(path.join(mockClientDist, 'index.html'), '<!DOCTYPE html><html><head><title>Project Preview</title></head><body>Project Preview</body></html>');
   
   app = await createServer(testDir, 0, mockClientDist);
 });
@@ -263,6 +263,21 @@ describe('Health Check', () => {
   });
 });
 
+describe('Meta API', () => {
+  it('should return project identity for browser titles', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/meta',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const data = JSON.parse(response.payload);
+    expect(data.name).toBe(path.basename(testDir));
+    expect(data.root).toBe(testDir);
+    expect(data.port).toBe(0);
+  });
+});
+
 describe('SPA Routes', () => {
   it('should serve index.html for non-API routes', async () => {
     const response = await app.inject({
@@ -272,6 +287,7 @@ describe('SPA Routes', () => {
     
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/html');
+    expect(response.payload).toContain(`${path.basename(testDir)} - Project Preview`);
   });
   
   it('should return 404 for unknown API routes', async () => {

@@ -22,11 +22,33 @@ export interface FileInfo {
   isLarge?: boolean;
 }
 
+interface ProjectMeta {
+  name: string;
+  root: string;
+  port: number;
+}
+
 const App: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [treeData, setTreeData] = useState<FileNode[]>([]);
+  const [projectMeta, setProjectMeta] = useState<ProjectMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchMeta = useCallback(async () => {
+    try {
+      const response = await fetch('/api/meta');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json() as ProjectMeta;
+      setProjectMeta(data);
+      document.title = `${data.name} - Project Preview`;
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const fetchTree = useCallback(async (path: string = '') => {
     try {
@@ -59,8 +81,9 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    fetchMeta();
     fetchTree();
-  }, [fetchTree]);
+  }, [fetchMeta, fetchTree]);
 
   const handleSelectFile = useCallback((node: FileNode) => {
     if (node.type === 'file') {
@@ -80,26 +103,42 @@ const App: React.FC = () => {
         node.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : treeData;
+  const showSearch = searchOpen || searchQuery.length > 0;
 
   return (
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <span className="header-title">Project Preview</span>
-          <span className="header-path">Root</span>
+          <img className="header-icon" src="/icon.png" alt="" aria-hidden="true" />
+          <div className="header-project">
+            <span className="header-title">{projectMeta?.name || 'Project Preview'}</span>
+            <span className="header-path" title={projectMeta?.root || ''}>
+              {projectMeta?.root || 'Loading project...'}
+            </span>
+          </div>
         </div>
         <div className="header-right">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Search files..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <button className="btn" onClick={handleRefresh}>
-            🔄 Refresh
+          <button
+            className={`icon-btn ${showSearch ? 'active' : ''}`}
+            title="Search files"
+            aria-label="Search files"
+            onClick={() => setSearchOpen(open => !open)}
+          >
+            🔍
+          </button>
+          {showSearch && (
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                autoFocus
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          )}
+          <button className="icon-btn" title="Refresh files" aria-label="Refresh files" onClick={handleRefresh}>
+            ↻
           </button>
         </div>
       </header>

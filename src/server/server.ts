@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs/promises';
 import fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyCors from '@fastify/cors';
@@ -8,6 +9,22 @@ import { saveInstance, removeInstance } from './process-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function renderIndexHtml(staticRoot: string, rootDir: string): Promise<string> {
+  const html = await fs.readFile(path.join(staticRoot, 'index.html'), 'utf-8');
+  const projectName = path.basename(rootDir) || 'Project Preview';
+  const title = `${projectName} - Project Preview`;
+  return html.replace(/<title>.*?<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+}
 
 export async function createServer(rootDir: string, port: number, clientDist?: string) {
   const app = fastify({
@@ -25,6 +42,14 @@ export async function createServer(rootDir: string, port: number, clientDist?: s
   app.get('/api/health', async () => {
     return { status: 'ok', root: rootDir };
   });
+
+  app.get('/api/meta', async () => {
+    return {
+      name: path.basename(rootDir) || rootDir,
+      root: rootDir,
+      port,
+    };
+  });
   
   // Register API routes
   await registerRoutes(app, rootDir);
@@ -34,6 +59,7 @@ export async function createServer(rootDir: string, port: number, clientDist?: s
   await app.register(fastifyStatic, {
     root: staticRoot,
     prefix: '/',
+    index: false,
     wildcard: false,
   });
   
@@ -42,7 +68,8 @@ export async function createServer(rootDir: string, port: number, clientDist?: s
     if (request.url.startsWith('/api/')) {
       return reply.status(404).send({ error: 'API endpoint not found' });
     }
-    return reply.sendFile('index.html', staticRoot);
+    const html = await renderIndexHtml(staticRoot, rootDir);
+    return reply.type('text/html').send(html);
   });
   
   return app;

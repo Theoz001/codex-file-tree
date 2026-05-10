@@ -6,10 +6,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
 import time
+from urllib.parse import urlparse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,13 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 CLI = PLUGIN_ROOT / "dist" / "server" / "index.js"
 STATE_DIR = Path.home() / ".cache" / "project-preview"
 LOG_FILE = STATE_DIR / "project-preview-mcp.log"
+
+
+def project_slug(root: str) -> str:
+    name = Path(root).name or "root"
+    slug = re.sub(r"\s+", "-", name.strip())
+    slug = re.sub(r"[/?#%\\]", "-", slug)
+    return slug or "root"
 
 
 def abs_root(root: str) -> str:
@@ -94,7 +103,7 @@ def start_preview(root_arg: str, port: int = 8098) -> dict[str, Any]:
     if not url.startswith("http://127.0.0.1:"):
         raise RuntimeError(f"project-preview url returned unexpected output: {result.stdout.strip()}")
     
-    actual_port = int(url.rsplit(":", 1)[1])
+    actual_port = int(urlparse(url).port or 0)
     state = read_state(root) or {}
     return {"ok": True, "root": root, "url": url, "port": actual_port, "pid": state.get("pid")}
 
@@ -106,8 +115,10 @@ def list_previews() -> dict[str, Any]:
         try:
             state = json.loads(file.read_text(encoding="utf-8"))
             port = int(state.get("port", 0))
+            root = str(state.get("root", ""))
             alive = bool(port and health(port))
-            instances.append({**state, "alive": alive, "url": f"http://127.0.0.1:{port}" if port else None})
+            url = f"http://127.0.0.1:{port}/p/{project_slug(root)}/" if port else None
+            instances.append({**state, "alive": alive, "url": url})
         except Exception:
             continue
     return {"ok": True, "instances": instances}
