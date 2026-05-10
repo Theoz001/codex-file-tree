@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { FileNode } from '../App';
 
 interface FileTreeProps {
@@ -6,13 +6,53 @@ interface FileTreeProps {
   onSelect: (node: FileNode) => void;
   selectedPath?: string;
   level?: number;
+  canWrite?: boolean;
+  onCopyPath?: (node: FileNode) => void;
+  onRename?: (node: FileNode) => void;
+  onTrash?: (node: FileNode) => void;
 }
 
-const FileTree: React.FC<FileTreeProps> = ({ nodes, onSelect, selectedPath, level = 0 }) => {
+interface ContextMenuState {
+  node: FileNode;
+  x: number;
+  y: number;
+}
+
+const FileTree: React.FC<FileTreeProps> = ({
+  nodes,
+  onSelect,
+  selectedPath,
+  level = 0,
+  canWrite = false,
+  onCopyPath,
+  onRename,
+  onTrash,
+}) => {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [childrenByPath, setChildrenByPath] = useState<Record<string, FileNode[]>>({});
   const [loadingDirs, setLoadingDirs] = useState<Set<string>>(new Set());
   const [errorDirs, setErrorDirs] = useState<Record<string, string>>({});
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const close = () => setContextMenu(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [contextMenu]);
 
   const toggleDir = async (path: string) => {
     if (expandedDirs.has(path)) {
@@ -76,6 +116,24 @@ const FileTree: React.FC<FileTreeProps> = ({ nodes, onSelect, selectedPath, leve
     return iconMap[ext || ''] || '📄';
   };
 
+  const openContextMenu = (event: React.MouseEvent, node: FileNode) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (node.type === 'file') {
+      onSelect(node);
+    }
+    setContextMenu({
+      node,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 180)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 140)),
+    });
+  };
+
+  const runMenuAction = (action: () => void) => {
+    setContextMenu(null);
+    action();
+  };
+
   return (
     <div>
       {nodes.map(node => (
@@ -90,6 +148,7 @@ const FileTree: React.FC<FileTreeProps> = ({ nodes, onSelect, selectedPath, leve
                 onSelect(node);
               }
             }}
+            onContextMenu={(event) => openContextMenu(event, node)}
           >
             <span className="tree-toggle">
               {node.type === 'directory' && (expandedDirs.has(node.path) ? '▼' : '▶')}
@@ -129,12 +188,43 @@ const FileTree: React.FC<FileTreeProps> = ({ nodes, onSelect, selectedPath, leve
                   onSelect={onSelect}
                   selectedPath={selectedPath}
                   level={level + 1}
+                  canWrite={canWrite}
+                  onCopyPath={onCopyPath}
+                  onRename={onRename}
+                  onTrash={onTrash}
                 />
               )}
             </div>
           )}
         </div>
       ))}
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {onCopyPath && (
+            <button type="button" onClick={() => runMenuAction(() => onCopyPath(contextMenu.node))}>
+              Copy path
+            </button>
+          )}
+          {canWrite && onRename && (
+            <button type="button" onClick={() => runMenuAction(() => onRename(contextMenu.node))}>
+              Rename
+            </button>
+          )}
+          {canWrite && onTrash && (
+            <button
+              className="danger"
+              type="button"
+              onClick={() => runMenuAction(() => onTrash(contextMenu.node))}
+            >
+              Trash
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -50,10 +50,9 @@ export async function createServer(rootDir, port, clientDist) {
         root: staticRoot,
         prefix: '/',
         index: false,
-        wildcard: false,
     });
-    // Serve SPA - return index.html for all non-API routes
-    app.get('*', async (request, reply) => {
+    // Serve SPA - return index.html for all non-API routes not matched by static assets.
+    app.setNotFoundHandler(async (request, reply) => {
         if (request.url.startsWith('/api/')) {
             return reply.status(404).send({ error: 'API endpoint not found' });
         }

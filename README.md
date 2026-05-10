@@ -58,7 +58,7 @@ enabled.
 - Write APIs reject ignored/protected path segments such as `.git`,
   `node_modules`, `dist`, and `build`.
 - Save only writes existing text files under the 5 MB limit.
-- Rename and Trash are limited to regular files.
+- Rename and Trash are limited to files and directories.
 - Trash moves files to the platform trash location. Tests can override this with
   `PROJECT_PREVIEW_TRASH_DIR`.
 

@@ -30,6 +30,7 @@ beforeAll(async () => {
   await fs.writeFile(path.join(testDir, 'config.json'), '{"name": "test"}');
   await fs.writeFile(path.join(testDir, 'data.csv'), 'name,age\nAlice,30\nBob,25');
   await fs.writeFile(path.join(testDir, 'script.js'), 'console.log("hello");');
+  await fs.writeFile(path.join(testDir, 'sample.pdf'), '%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
   await fs.writeFile(path.join(testDir, 'large.txt'), 'x'.repeat(6 * 1024 * 1024)); // 6MB
   await fs.writeFile(path.join(testDir, 'subdir', 'nested.txt'), 'nested content');
   await fs.writeFile(path.join(testDir, 'binary.bin'), Buffer.from([0x00, 0x01, 0x02, 0x03]));
@@ -49,7 +50,9 @@ beforeAll(async () => {
   // Create a mock client dist directory with index.html for SPA tests
   const mockClientDist = path.join(testDir, 'client');
   await fs.mkdir(mockClientDist, { recursive: true });
+  await fs.mkdir(path.join(mockClientDist, 'assets'), { recursive: true });
   await fs.writeFile(path.join(mockClientDist, 'index.html'), '<!DOCTYPE html><html><head><title>Project Preview</title></head><body>Project Preview</body></html>');
+  await fs.writeFile(path.join(mockClientDist, 'assets', 'app.js'), 'console.log("asset");');
   app = await createServer(testDir, 0, mockClientDist);
 
   const metaResponse = await app.inject({
@@ -297,6 +300,21 @@ describe('Raw API', () => {
     expect(response.payload).toContain('# Test Project');
   });
 
+  it('should serve PDFs inline with range support', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/raw?path=sample.pdf',
+      headers: { range: 'bytes=0-7' },
+    });
+
+    expect(response.statusCode).toBe(206);
+    expect(response.headers['content-type']).toContain('application/pdf');
+    expect(response.headers['accept-ranges']).toBe('bytes');
+    expect(response.headers['content-disposition']).toContain('inline');
+    expect(response.headers['content-range']).toMatch(/^bytes 0-7\//);
+    expect(response.payload).toBe('%PDF-1.4');
+  });
+
   it('should reject paths outside root', async () => {
     const response = await app.inject({
       method: 'GET',
@@ -447,7 +465,7 @@ describe('Rename API', () => {
     await fs.unlink(path.join(testDir, 'renamed.txt'));
   });
 
-  it('should reject renaming a directory', async () => {
+  it('should rename a directory', async () => {
     await fs.mkdir(path.join(testDir, 'rename-dir'), { recursive: true });
     await fs.writeFile(path.join(testDir, 'rename-dir', 'file.txt'), 'inside');
 
@@ -458,10 +476,16 @@ describe('Rename API', () => {
       payload: { path: 'rename-dir', newName: 'renamed-dir' },
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(200);
+    const data = JSON.parse(response.payload);
+    expect(data.success).toBe(true);
+    expect(data.newPath).toBe('renamed-dir');
+
+    await expect(fs.access(path.join(testDir, 'rename-dir'))).rejects.toThrow();
+    await expect(fs.readFile(path.join(testDir, 'renamed-dir', 'file.txt'), 'utf-8')).resolves.toBe('inside');
 
     // Cleanup
-    await fs.rm(path.join(testDir, 'rename-dir'), { recursive: true, force: true });
+    await fs.rm(path.join(testDir, 'renamed-dir'), { recursive: true, force: true });
   });
 
   it('should reject rename when destination already exists', async () => {
@@ -573,9 +597,10 @@ describe('Trash API', () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it('should reject moving directories to trash', async () => {
+  it('should move directories to trash', async () => {
     const dirPath = path.join(testDir, 'trash-dir');
     await fs.mkdir(dirPath, { recursive: true });
+    await fs.writeFile(path.join(dirPath, 'file.txt'), 'inside');
 
     const response = await app.inject({
       method: 'POST',
@@ -584,9 +609,10 @@ describe('Trash API', () => {
       payload: { path: 'trash-dir' },
     });
 
-    expect(response.statusCode).toBe(400);
-    await expect(fs.access(dirPath)).resolves.toBeUndefined();
-    await fs.rm(dirPath, { recursive: true, force: true });
+    expect(response.statusCode).toBe(200);
+    await expect(fs.access(dirPath)).rejects.toThrow();
+    await expect(fs.readFile(path.join(trashDir, 'trash-dir', 'file.txt'), 'utf-8')).resolves.toBe('inside');
+    await fs.rm(path.join(trashDir, 'trash-dir'), { recursive: true, force: true });
   });
 
   it('should reject moving protected paths to trash', async () => {
@@ -654,6 +680,17 @@ describe('SPA Routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/html');
     expect(response.payload).toContain(`${path.basename(testDir)} - Project Preview`);
+  });
+
+  it('should serve built static assets before SPA fallback', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/assets/app.js',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('application/javascript');
+    expect(response.payload).toBe('console.log("asset");');
   });
 
   it('should return 404 for unknown API routes', async () => {

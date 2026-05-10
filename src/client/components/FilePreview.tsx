@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { githubLight } from '@uiw/codemirror-theme-github';
+import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
@@ -17,8 +17,9 @@ interface FilePreviewProps {
   writeMode: boolean;
   writeToken: string;
   onFileSaved: () => void;
-  onFileRenamed: (oldPath: string, newPath: string) => void;
-  onFileTrashed: (path: string) => void;
+  onCopyPath: (file: FileInfo) => void;
+  onRename: (file: FileInfo) => void;
+  onTrash: (file: FileInfo) => void;
 }
 
 const FilePreview: React.FC<FilePreviewProps> = ({
@@ -26,20 +27,57 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   writeMode,
   writeToken,
   onFileSaved,
-  onFileRenamed,
-  onFileTrashed,
+  onCopyPath,
+  onRename,
+  onTrash,
 }) => {
   const [markdownSource, setMarkdownSource] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [prefersDark, setPrefersDark] = useState(() => {
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  });
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsEditing(false);
     setEditedContent('');
     setSaveError(null);
+    setActionsOpen(false);
   }, [file?.path]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mediaQuery) return;
+
+    const handleChange = (event: MediaQueryListEvent) => setPrefersDark(event.matches);
+    setPrefersDark(mediaQuery.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActionsOpen(false);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [actionsOpen]);
 
   if (!file) {
     return (
@@ -129,66 +167,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     }
   };
 
-  const handleRename = async () => {
-    if (!file || !writeToken || isEditing || isSaving) return;
-    const newName = window.prompt(`Rename "${file.name}" to:`, file.name);
-    if (!newName || newName === file.name) return;
-    try {
-      const response = await fetch('/api/fs/rename', {
-        method: 'POST',
-        headers: writeHeaders(),
-        body: JSON.stringify({ path: file.path, newName }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'Rename failed' }));
-        throw new Error(data.error || `HTTP ${response.status}`);
-      }
-      const result = await response.json();
-      onFileRenamed(file.path, result.newPath);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Rename failed');
-    }
-  };
-
-  const handleTrash = async () => {
-    if (!file || !writeToken || isEditing || isSaving) return;
-    const confirmed = window.confirm(`Move "${file.path}" to Trash?`);
-    if (!confirmed) return;
-    try {
-      const response = await fetch('/api/fs/trash', {
-        method: 'POST',
-        headers: writeHeaders(),
-        body: JSON.stringify({ path: file.path }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'Trash failed' }));
-        throw new Error(data.error || `HTTP ${response.status}`);
-      }
-      onFileTrashed(file.path);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Trash failed');
-    }
-  };
-
-  const handleCopyPath = async () => {
-    if (!file) return;
-    try {
-      await navigator.clipboard.writeText(file.absolutePath);
-    } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = file.absolutePath;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-  };
-
   const canEdit = file.isText && !file.isLarge && file.content !== undefined;
   const canWrite = writeMode && !!writeToken;
+  const editorTheme = prefersDark ? githubDark : githubLight;
+  const rawFileUrl = `/api/raw?path=${encodeURIComponent(file.path)}`;
 
   const renderContent = () => {
     if (file.isLarge && file.isText) {
@@ -204,7 +186,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     if (file.mimeType === 'text/markdown' && file.content !== undefined) {
       return (
         <div>
-          <div className="preview-actions" style={{ marginBottom: '12px' }}>
+          <div className="preview-actions markdown-toggle">
             <button
               className={`btn ${!markdownSource ? 'btn-primary' : ''}`}
               onClick={() => setMarkdownSource(false)}
@@ -221,7 +203,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           {markdownSource || isEditing ? (
             <CodeMirror
               value={isEditing ? editedContent : file.content}
-              theme={githubLight}
+              theme={editorTheme}
               extensions={[markdown()]}
               editable={isEditing}
               basicSetup={{ lineNumbers: true }}
@@ -245,7 +227,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         return (
           <CodeMirror
             value={isEditing ? editedContent : formatted}
-            theme={githubLight}
+            theme={editorTheme}
             extensions={[json()]}
             editable={isEditing}
             basicSetup={{ lineNumbers: true }}
@@ -257,7 +239,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         return (
           <CodeMirror
             value={isEditing ? editedContent : file.content}
-            theme={githubLight}
+            theme={editorTheme}
             extensions={[json()]}
             editable={isEditing}
             basicSetup={{ lineNumbers: true }}
@@ -273,7 +255,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         return (
           <CodeMirror
             value={editedContent}
-            theme={githubLight}
+            theme={editorTheme}
             extensions={[]}
             editable={true}
             basicSetup={{ lineNumbers: true }}
@@ -287,7 +269,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         const headers = Object.keys(result.data[0] as Record<string, unknown>);
         return (
           <div>
-            <p style={{ marginBottom: '12px', color: '#666', fontSize: '13px' }}>
+            <p className="csv-note">
               Showing {Math.min(result.data.length, 100)} of {result.data.length} rows
             </p>
             <table className="csv-table">
@@ -317,7 +299,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
       return (
         <CodeMirror
           value={isEditing ? editedContent : file.content}
-          theme={githubLight}
+          theme={editorTheme}
           extensions={getLanguageExtensions(file.name)}
           editable={isEditing}
           basicSetup={{ lineNumbers: true }}
@@ -331,7 +313,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
       return (
         <div className="image-preview">
           <img
-            src={`/api/raw?path=${encodeURIComponent(file.path)}`}
+            src={rawFileUrl}
             alt={file.name}
           />
         </div>
@@ -341,10 +323,20 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     if (file.mimeType === 'application/pdf') {
       return (
         <div className="pdf-preview">
-          <iframe
-            src={`/api/raw?path=${encodeURIComponent(file.path)}`}
-            title={file.name}
-          />
+          <div className="pdf-toolbar">
+            <a className="btn" href={rawFileUrl} target="_blank" rel="noreferrer">
+              Open PDF
+            </a>
+          </div>
+          <object data={`${rawFileUrl}#toolbar=1&navpanes=0`} type="application/pdf">
+            <div className="binary-info">
+              <h3>{file.name}</h3>
+              <p>This browser cannot render this PDF inline.</p>
+              <a className="btn" href={rawFileUrl} target="_blank" rel="noreferrer">
+                Open PDF
+              </a>
+            </div>
+          </object>
         </div>
       );
     }
@@ -355,7 +347,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         <div className="media-preview">
           <Tag controls style={{ maxWidth: '100%' }}>
             <source
-              src={`/api/raw?path=${encodeURIComponent(file.path)}`}
+              src={rawFileUrl}
               type={file.mimeType}
             />
             Your browser does not support this media type.
@@ -367,11 +359,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     // Binary / unsupported files
     return (
       <div className="binary-info">
-        <h3>📄 {file.name}</h3>
+        <h3>{file.name}</h3>
         <p><strong>Size:</strong> {formatSize(file.size)}</p>
         <p><strong>Modified:</strong> {formatDate(file.mtime)}</p>
         <p><strong>Type:</strong> {file.mimeType}</p>
-        <p style={{ marginTop: '24px', color: '#999' }}>
+        <p className="unsupported-note">
           This file type is not supported for preview.
         </p>
       </div>
@@ -388,12 +380,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           </div>
         </div>
         <div className="preview-actions">
-          <button className="btn" onClick={handleCopyPath} title="Copy absolute path">
-            📋 Copy path
-          </button>
           {canWrite && canEdit && !isEditing && (
             <button className="btn" onClick={handleEdit}>
-              ✏️ Edit
+              Edit
             </button>
           )}
           {canWrite && isEditing && (
@@ -403,29 +392,55 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                 onClick={handleSave}
                 disabled={isSaving}
               >
-                {isSaving ? 'Saving...' : '💾 Save'}
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
               <button className="btn" onClick={handleCancel} disabled={isSaving}>
-                ❌ Cancel
+                Cancel
               </button>
             </>
           )}
-          {canWrite && !isEditing && (
-            <>
-              <button className="btn" onClick={handleRename} disabled={isSaving}>
-                ✏️ Rename
-              </button>
-              <button className="btn btn-danger" onClick={handleTrash} disabled={isSaving}>
-                🗑️ Trash
-              </button>
-            </>
-          )}
+          <div className="action-menu" ref={actionsRef}>
+            <button
+              className={`icon-btn ${actionsOpen ? 'active' : ''}`}
+              type="button"
+              title="File actions"
+              aria-label="File actions"
+              aria-expanded={actionsOpen}
+              onClick={() => setActionsOpen(open => !open)}
+            >
+              ...
+            </button>
+            {actionsOpen && (
+              <div className="action-menu-popover">
+                <button type="button" onClick={() => { setActionsOpen(false); onCopyPath(file); }}>
+                  Copy path
+                </button>
+                {canWrite && !isEditing && (
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => { setActionsOpen(false); onRename(file); }}
+                  >
+                    Rename
+                  </button>
+                )}
+                {canWrite && !isEditing && (
+                  <button
+                    className="danger"
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => { setActionsOpen(false); onTrash(file); }}
+                  >
+                    Trash
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {saveError && (
-        <div style={{ padding: '8px 16px', background: '#ffebee', color: '#c62828', fontSize: '13px' }}>
-          {saveError}
-        </div>
+        <div className="error-banner">{saveError}</div>
       )}
       <div className="preview-content">{renderContent()}</div>
     </div>

@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import { timingSafeEqual } from 'crypto';
 import { assertExistingPathInsideRoot, assertParentInsideRoot, hasIgnoredSegment, isPathSafe, sanitizePath, MAX_FILE_SIZE, WRITE_TOKEN_HEADER, } from './security.js';
 import { getDirectoryTree, getFileInfo, getMimeType, isTextFile } from './file-utils.js';
@@ -31,6 +32,43 @@ function isAccessDenied(err) {
 }
 function isProtectedWritePath(safePath) {
     return hasIgnoredSegment(safePath);
+}
+function encodeContentDispositionFilename(filename) {
+    const fallback = filename.replace(/[^\x20-\x7e]|["\\;]/g, '_') || 'file';
+    const encoded = encodeURIComponent(filename).replace(/['()]/g, char => `%${char.charCodeAt(0).toString(16)}`);
+    return `inline; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+function parseRangeHeader(rangeHeader, fileSize) {
+    if (fileSize <= 0)
+        return null;
+    const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+    if (!match)
+        return null;
+    const [, rawStart, rawEnd] = match;
+    if (!rawStart && !rawEnd)
+        return null;
+    if (!rawStart) {
+        const suffixLength = Number(rawEnd);
+        if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0)
+            return null;
+        return {
+            start: Math.max(fileSize - suffixLength, 0),
+            end: fileSize - 1,
+        };
+    }
+    const start = Number(rawStart);
+    const end = rawEnd ? Number(rawEnd) : fileSize - 1;
+    if (!Number.isSafeInteger(start) ||
+        !Number.isSafeInteger(end) ||
+        start < 0 ||
+        end < start ||
+        start >= fileSize) {
+        return null;
+    }
+    return {
+        start,
+        end: Math.min(end, fileSize - 1),
+    };
 }
 export async function registerRoutes(fastify, rootDir, writeToken) {
     // GET /api/tree?path=...
@@ -103,10 +141,29 @@ export async function registerRoutes(fastify, rootDir, writeToken) {
             if (!stats.isFile()) {
                 return reply.status(400).send({ error: 'Not a file' });
             }
-            // Read and send file directly
-            const content = await fs.readFile(targetPath);
             const mimeType = getMimeType(targetPath);
-            return reply.header('Content-Type', mimeType).send(content);
+            const rangeHeader = getHeaderValue(request.headers.range);
+            reply
+                .header('Accept-Ranges', 'bytes')
+                .header('Content-Type', mimeType)
+                .header('Content-Disposition', encodeContentDispositionFilename(path.basename(targetPath)));
+            if (rangeHeader) {
+                const range = parseRangeHeader(rangeHeader, stats.size);
+                if (!range) {
+                    return reply
+                        .status(416)
+                        .header('Content-Range', `bytes */${stats.size}`)
+                        .send();
+                }
+                return reply
+                    .status(206)
+                    .header('Content-Length', String(range.end - range.start + 1))
+                    .header('Content-Range', `bytes ${range.start}-${range.end}/${stats.size}`)
+                    .send(createReadStream(targetPath, { start: range.start, end: range.end }));
+            }
+            return reply
+                .header('Content-Length', String(stats.size))
+                .send(createReadStream(targetPath));
         }
         catch (err) {
             const error = err;
@@ -203,8 +260,8 @@ export async function registerRoutes(fastify, rootDir, writeToken) {
             await assertExistingPathInsideRoot(targetPath, rootDir);
             await assertParentInsideRoot(newPath, rootDir);
             const stats = await fs.lstat(targetPath);
-            if (!stats.isFile()) {
-                return reply.status(400).send({ error: 'Only files can be renamed' });
+            if (!stats.isFile() && !stats.isDirectory()) {
+                return reply.status(400).send({ error: 'Only files and directories can be renamed' });
             }
             // Check destination doesn't exist
             try {
@@ -250,8 +307,8 @@ export async function registerRoutes(fastify, rootDir, writeToken) {
         try {
             await assertExistingPathInsideRoot(targetPath, rootDir);
             const stats = await fs.lstat(targetPath);
-            if (!stats.isFile()) {
-                return reply.status(400).send({ error: 'Only files can be moved to trash' });
+            if (!stats.isFile() && !stats.isDirectory()) {
+                return reply.status(400).send({ error: 'Only files and directories can be moved to trash' });
             }
             await moveToTrash(targetPath);
             return reply.send({ success: true });
