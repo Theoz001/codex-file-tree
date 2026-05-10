@@ -5,7 +5,7 @@ import fastifyStatic from '@fastify/static';
 import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
-import { saveInstance, removeInstance } from './process-manager.js';
+import { listInstances, projectSlug, projectUrl, removeInstance, saveInstance } from './process-manager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 function escapeHtml(value) {
@@ -21,6 +21,30 @@ async function renderIndexHtml(staticRoot, rootDir) {
     const projectName = path.basename(rootDir) || 'Project Preview';
     const title = `${projectName} - Project Preview`;
     return html.replace(/<title>.*?<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+}
+export function getRequestedProjectSlug(url) {
+    const pathname = url.split(/[?#]/, 1)[0] || '/';
+    const match = /^\/p\/([^/?#]+)/.exec(pathname);
+    if (!match)
+        return null;
+    try {
+        return decodeURIComponent(match[1]);
+    }
+    catch {
+        return match[1];
+    }
+}
+export async function resolveProjectRedirect(requestUrl, rootDir, port) {
+    const requestedSlug = getRequestedProjectSlug(requestUrl);
+    if (!requestedSlug || requestedSlug === projectSlug(rootDir))
+        return null;
+    const matches = (await listInstances())
+        .filter(instance => (instance.alive
+        && instance.port !== port
+        && projectSlug(instance.root) === requestedSlug))
+        .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+    const match = matches[0];
+    return match ? projectUrl(match.port, match.root) : null;
 }
 export async function createServer(rootDir, port, clientDist) {
     const writeToken = randomBytes(32).toString('base64url');
@@ -63,8 +87,11 @@ export async function createServer(rootDir, port, clientDist) {
         if (request.url.startsWith('/api/')) {
             return reply.status(404).send({ error: 'API endpoint not found' });
         }
-        const html = await renderIndexHtml(staticRoot, rootDir);
-        return reply.type('text/html').send(html);
+        const redirectUrl = await resolveProjectRedirect(request.url, rootDir, port);
+        if (redirectUrl) {
+            return reply.redirect(redirectUrl, 302);
+        }
+        return sendIndexHtml(reply);
     });
     return app;
 }

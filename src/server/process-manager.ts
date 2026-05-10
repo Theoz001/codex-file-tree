@@ -10,23 +10,36 @@ export interface InstanceState {
   startedAt: string;
 }
 
-interface InstanceWithStatus extends InstanceState {
+export interface InstanceWithStatus extends InstanceState {
   id: string;
   alive: boolean;
 }
 
-const STATE_DIR = path.join(os.homedir(), '.cache', 'project-preview');
+const DEFAULT_STATE_DIR = path.join(os.homedir(), '.cache', 'project-preview');
+
+function getStateDir(): string {
+  return process.env.PROJECT_PREVIEW_STATE_DIR || DEFAULT_STATE_DIR;
+}
+
+export function projectSlug(root: string): string {
+  const name = path.basename(root) || 'root';
+  return name.trim().replace(/\s+/g, '-').replace(/[/?#%\\]/g, '-') || 'root';
+}
+
+export function projectUrl(port: number, root: string): string {
+  return `http://127.0.0.1:${port}/p/${encodeURIComponent(projectSlug(root))}/`;
+}
 
 function getInstanceId(root: string): string {
   return createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 16);
 }
 
 function getStateFile(instanceId: string): string {
-  return path.join(STATE_DIR, `${instanceId}.json`);
+  return path.join(getStateDir(), `${instanceId}.json`);
 }
 
 async function ensureStateDir(): Promise<void> {
-  await fs.mkdir(STATE_DIR, { recursive: true });
+  await fs.mkdir(getStateDir(), { recursive: true });
 }
 
 export async function saveInstance(root: string, port: number, pid: number): Promise<void> {
@@ -63,13 +76,14 @@ export async function removeInstance(root: string): Promise<void> {
 export async function listInstances(): Promise<InstanceWithStatus[]> {
   try {
     await ensureStateDir();
-    const files = await fs.readdir(STATE_DIR);
+    const stateDir = getStateDir();
+    const files = await fs.readdir(stateDir);
     const instances: InstanceWithStatus[] = [];
     
     for (const file of files) {
       if (!file.endsWith('.json')) continue;
       try {
-        const content = await fs.readFile(path.join(STATE_DIR, file), 'utf-8');
+        const content = await fs.readFile(path.join(stateDir, file), 'utf-8');
         const state = JSON.parse(content) as InstanceState;
         const alive = await isProcessAlive(state.pid, state.port, state.root);
         instances.push({

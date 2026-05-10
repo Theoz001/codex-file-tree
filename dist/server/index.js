@@ -4,13 +4,8 @@ import net from 'net';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { startServer } from './server.js';
-import { getInstance, removeInstance, listInstances, isProcessAlive, cleanupDeadInstances } from './process-manager.js';
+import { cleanupDeadInstances, getInstance, isProcessAlive, listInstances, projectUrl, removeInstance } from './process-manager.js';
 const __filename = fileURLToPath(import.meta.url);
-function projectUrl(port, root) {
-    const name = path.basename(root) || 'root';
-    const slug = name.trim().replace(/\s+/g, '-').replace(/[/?#%\\]/g, '-') || 'root';
-    return `http://127.0.0.1:${port}/p/${slug}/`;
-}
 function parseArgs() {
     const args = process.argv.slice(2);
     let command = 'start';

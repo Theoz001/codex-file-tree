@@ -2,15 +2,25 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 import { createHash } from 'crypto';
-const STATE_DIR = path.join(os.homedir(), '.cache', 'project-preview');
+const DEFAULT_STATE_DIR = path.join(os.homedir(), '.cache', 'project-preview');
+function getStateDir() {
+    return process.env.PROJECT_PREVIEW_STATE_DIR || DEFAULT_STATE_DIR;
+}
+export function projectSlug(root) {
+    const name = path.basename(root) || 'root';
+    return name.trim().replace(/\s+/g, '-').replace(/[/?#%\\]/g, '-') || 'root';
+}
+export function projectUrl(port, root) {
+    return `http://127.0.0.1:${port}/p/${encodeURIComponent(projectSlug(root))}/`;
+}
 function getInstanceId(root) {
     return createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 16);
 }
 function getStateFile(instanceId) {
-    return path.join(STATE_DIR, `${instanceId}.json`);
+    return path.join(getStateDir(), `${instanceId}.json`);
 }
 async function ensureStateDir() {
-    await fs.mkdir(STATE_DIR, { recursive: true });
+    await fs.mkdir(getStateDir(), { recursive: true });
 }
 export async function saveInstance(root, port, pid) {
     await ensureStateDir();
@@ -45,13 +55,14 @@ export async function removeInstance(root) {
 export async function listInstances() {
     try {
         await ensureStateDir();
-        const files = await fs.readdir(STATE_DIR);
+        const stateDir = getStateDir();
+        const files = await fs.readdir(stateDir);
         const instances = [];
         for (const file of files) {
             if (!file.endsWith('.json'))
                 continue;
             try {
-                const content = await fs.readFile(path.join(STATE_DIR, file), 'utf-8');
+                const content = await fs.readFile(path.join(stateDir, file), 'utf-8');
                 const state = JSON.parse(content);
                 const alive = await isProcessAlive(state.pid, state.port, state.root);
                 instances.push({

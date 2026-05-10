@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { createServer } from '../src/server/server.js';
+import { createServer, getRequestedProjectSlug } from '../src/server/server.js';
+import { projectUrl, saveInstance } from '../src/server/process-manager.js';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -836,6 +837,43 @@ describe('SPA Routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/html');
     expect(response.payload).toContain(`${path.basename(testDir)} - Project Preview`);
+  });
+
+  it('should parse encoded project slugs from project preview URLs', () => {
+    expect(getRequestedProjectSlug('/p/My-Project/')).toBe('My-Project');
+    expect(getRequestedProjectSlug(`/p/${encodeURIComponent('新业态治理国际比较')}/`)).toBe('新业态治理国际比较');
+    expect(getRequestedProjectSlug('/assets/app.js')).toBeNull();
+  });
+
+  it('should redirect stale project URLs to the matching live preview server', async () => {
+    const previousStateDir = process.env.PROJECT_PREVIEW_STATE_DIR;
+    const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'project-preview-state-'));
+    const otherRoot = path.join(os.tmpdir(), '新业态治理国际比较');
+    process.env.PROJECT_PREVIEW_STATE_DIR = stateDir;
+
+    try {
+      await saveInstance(otherRoot, 8101, 999999);
+      vi.stubGlobal('fetch', vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: 'ok', root: otherRoot }),
+      })));
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/p/${encodeURIComponent(path.basename(otherRoot))}/`,
+      });
+
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toBe(projectUrl(8101, otherRoot));
+    } finally {
+      vi.unstubAllGlobals();
+      await fs.rm(stateDir, { recursive: true, force: true });
+      if (previousStateDir === undefined) {
+        delete process.env.PROJECT_PREVIEW_STATE_DIR;
+      } else {
+        process.env.PROJECT_PREVIEW_STATE_DIR = previousStateDir;
+      }
+    }
   });
 
   it('should serve built static assets before SPA fallback', async () => {
