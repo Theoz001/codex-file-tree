@@ -20,7 +20,7 @@ description: "Use when the user asks to open Project Preview, preview the curren
 - **不是 wiki**：不做知识库、不做双向链接、不做笔记管理
 - **不是完整 file manager**：不上传、不分享、不跨 root 管理文件
 - **不是后台常驻服务**：按需启动，进程可复用，支持 stop/list 管理
-- **是项目预览器**：在浏览器里浏览当前工作目录的文件结构，查看文件内容；Write mode 只支持受保护的文本保存、文件重命名和文件移入 Trash
+- **是项目预览器**：在浏览器里浏览当前工作目录的文件结构，查看文件内容；Write mode 只支持受保护的文本保存、文件/目录重命名和文件/目录移入 Trash
 
 ## 工作流
 
@@ -58,7 +58,7 @@ node dist/server/index.js list
 - 默认使用浏览和预览；Write mode 由前端显式开启
 - 写接口要求 per-process write token
 - 保存只允许已有文本文件
-- 重命名和 Trash 只允许普通文件
+- 重命名和 Trash 只允许普通文件和目录
 - `.git`, `node_modules`, `dist`, `build` 等 ignored/protected path 不允许被写接口修改
 - 不提供执行系统命令的能力
 
@@ -105,7 +105,7 @@ node dist/server/index.js list
 | JSON | 格式化显示 |
 | CSV | 表格预览（限制行数） |
 | 图片 | 直接显示 |
-| PDF | 浏览器原生 iframe |
+| PDF | 浏览器原生 object 预览 + 打开原始文件 fallback |
 | 音频/视频 | 浏览器原生 player |
 | Office (docx/xlsx/pptx) | 显示文件信息（暂不支持完整预览） |
 | 其他二进制 | 显示元信息，提示暂不支持 |

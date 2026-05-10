@@ -44,8 +44,15 @@ export async function createServer(rootDir, port, clientDist) {
     });
     // Register API routes
     await registerRoutes(app, rootDir, writeToken);
-    // Serve static files (built client)
     const staticRoot = clientDist || path.resolve(__dirname, '../client');
+    const sendIndexHtml = async (reply) => {
+        const html = await renderIndexHtml(staticRoot, rootDir);
+        return reply.type('text/html').send(html);
+    };
+    app.get('/', async (_request, reply) => {
+        return sendIndexHtml(reply);
+    });
+    // Serve static files (built client)
     await app.register(fastifyStatic, {
         root: staticRoot,
         prefix: '/',

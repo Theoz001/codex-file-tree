@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import type { FastifyReply } from 'fastify';
 import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
@@ -51,9 +52,18 @@ export async function createServer(rootDir: string, port: number, clientDist?: s
   
   // Register API routes
   await registerRoutes(app, rootDir, writeToken);
+
+  const staticRoot = clientDist || path.resolve(__dirname, '../client');
+  const sendIndexHtml = async (reply: FastifyReply) => {
+    const html = await renderIndexHtml(staticRoot, rootDir);
+    return reply.type('text/html').send(html);
+  };
+
+  app.get('/', async (_request, reply) => {
+    return sendIndexHtml(reply);
+  });
   
   // Serve static files (built client)
-  const staticRoot = clientDist || path.resolve(__dirname, '../client');
   await app.register(fastifyStatic, {
     root: staticRoot,
     prefix: '/',

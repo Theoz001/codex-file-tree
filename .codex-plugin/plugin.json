@@ -17,8 +17,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Project Preview",
-    "shortDescription": "Read-only browser preview for the current workspace",
-    "longDescription": "Project Preview starts or reuses a local read-only project file preview server bound to 127.0.0.1 and rooted at the current Codex working directory.",
+    "shortDescription": "Local browser preview for the current workspace",
+    "longDescription": "Project Preview starts or reuses a local project file preview server bound to 127.0.0.1 and rooted at the current Codex working directory.",
     "developerName": "Zhutao",
     "category": "Productivity",
     "capabilities": [
@@ -26,9 +26,9 @@
       "Read",
       "Tools"
     ],
-    "websiteURL": "https://github.com/",
-    "privacyPolicyURL": "https://github.com/",
-    "termsOfServiceURL": "https://github.com/",
+    "websiteURL": "https://github.com/Ruczhutao/codex-file-tree",
+    "privacyPolicyURL": "https://github.com/Ruczhutao/codex-file-tree#privacy",
+    "termsOfServiceURL": "https://github.com/Ruczhutao/codex-file-tree/blob/main/LICENSE",
     "defaultPrompt": [
       "打开项目预览",
       "预览当前项目文件",
