@@ -1,0 +1,41 @@
+{
+  "name": "project-preview",
+  "version": "1.0.0",
+  "description": "Lightweight local project file previewer for Codex in-app browser",
+  "author": {
+    "name": "Zhutao"
+  },
+  "homepage": "https://github.com/filebrowser/filebrowser",
+  "repository": "",
+  "license": "MIT",
+  "keywords": [
+    "project-preview",
+    "file-tree",
+    "readonly",
+    "browser"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Project Preview",
+    "shortDescription": "Read-only browser preview for the current workspace",
+    "longDescription": "Project Preview starts or reuses a local read-only project file preview server bound to 127.0.0.1 and rooted at the current Codex working directory.",
+    "developerName": "Zhutao",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Tools"
+    ],
+    "websiteURL": "https://github.com/",
+    "privacyPolicyURL": "https://github.com/",
+    "termsOfServiceURL": "https://github.com/",
+    "defaultPrompt": [
+      "打开项目预览",
+      "预览当前项目文件",
+      "打开文件树"
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  },
+  "mcpServers": "./.mcp.json"
+}

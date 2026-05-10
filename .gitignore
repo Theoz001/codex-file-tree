@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+*.log
+*.tmp
+*.temp
+coverage/
+.cache/
+__pycache__/
+.pytest_cache/

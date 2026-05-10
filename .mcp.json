@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "project-preview": {
+      "command": "python3",
+      "args": [
+        "./scripts/project_preview_mcp.py"
+      ],
+      "cwd": "."
+    }
+  }
+}
