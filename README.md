@@ -5,6 +5,23 @@ workspace in the Codex in-app browser.
 
 [中文说明](README.zh-CN.md)
 
+## Quick Install With Codex
+
+Open Codex and paste this request:
+
+```text
+Install Project Preview from https://github.com/Ruczhutao/codex-file-tree as a local Codex plugin. Read the repository README first, then clone it, install dependencies, run npm run build, link or install it as a local plugin, reload plugins if needed, and open Project Preview for my current workspace.
+```
+
+After installation, you can ask Codex:
+
+```text
+Open Project Preview for this workspace.
+```
+
+If Codex cannot install local plugins automatically in your environment, use the
+manual install steps below.
+
 ## Features
 
 - File tree for the selected workspace root
@@ -16,9 +33,11 @@ workspace in the Codex in-app browser.
 - Context-menu file actions for copying paths, renaming, and moving items to trash
 - Local-only server bound to `127.0.0.1`
 
-## Install
+## Manual Install
 
 ```bash
+git clone https://github.com/Ruczhutao/codex-file-tree.git
+cd codex-file-tree
 npm install
 npm run build
 ```
