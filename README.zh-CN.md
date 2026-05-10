@@ -8,8 +8,9 @@
 Project Preview 是一个本地 Codex 插件，用来在 Codex 内置浏览器中预览当前工作目录。
 
 > 🐛 **为什么会有这个项目：** Project Preview 是为绕过 Codex App 文件树“隐身”
-> 问题而生：`View > Toggle File Tree` 有时是可用状态，但仍不能可靠显示文件树。
-> 如果上游修复了这个问题，这个插件可能就不再那么必要。见
+> 问题而生：点击 `View > Toggle File Tree` 或使用快捷键都不能让文件树出现，
+> 用户只能通过很绕的路径重新打开项目文件。如果上游修复了这个问题，
+> 这个插件可能就不再那么必要。见
 > [openai/codex#20552](https://github.com/openai/codex/issues/20552#issuecomment-4411037859)。
 
 [English README](README.md)
