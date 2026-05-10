@@ -116,7 +116,7 @@ def list_previews() -> dict[str, Any]:
             state = json.loads(file.read_text(encoding="utf-8"))
             port = int(state.get("port", 0))
             root = str(state.get("root", ""))
-            alive = bool(port and health(port))
+            alive = bool(port and health(port, root))
             url = f"http://127.0.0.1:{port}/p/{project_slug(root)}/" if port else None
             instances.append({**state, "alive": alive, "url": url})
         except Exception:

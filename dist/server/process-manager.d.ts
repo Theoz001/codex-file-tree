@@ -12,7 +12,7 @@ export declare function saveInstance(root: string, port: number, pid: number): P
 export declare function getInstance(root: string): Promise<InstanceState | null>;
 export declare function removeInstance(root: string): Promise<void>;
 export declare function listInstances(): Promise<InstanceWithStatus[]>;
-export declare function isProcessAlive(pid: number, port: number): Promise<boolean>;
+export declare function isProcessAlive(pid: number, port: number, expectedRoot?: string): Promise<boolean>;
 export declare function cleanupDeadInstances(): Promise<void>;
 export {};
 //# sourceMappingURL=process-manager.d.ts.map

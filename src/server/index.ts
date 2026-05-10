@@ -53,7 +53,7 @@ async function handleStart(root: string, port: number) {
   const existing = await getInstance(root);
   
   if (existing) {
-    const alive = await isProcessAlive(existing.pid, existing.port);
+    const alive = await isProcessAlive(existing.pid, existing.port, root);
     if (alive) {
       console.log(`Preview server already running for ${root}`);
       console.log(`URL: ${projectUrl(existing.port, root)}`);
@@ -76,7 +76,7 @@ async function handleUrl(root: string, port: number) {
   const existing = await getInstance(root);
   
   if (existing) {
-    const alive = await isProcessAlive(existing.pid, existing.port);
+    const alive = await isProcessAlive(existing.pid, existing.port, root);
     if (alive) {
       console.log(projectUrl(existing.port, root));
       return;
@@ -100,7 +100,7 @@ async function handleUrl(root: string, port: number) {
   while (Date.now() < deadline) {
     const instance = await getInstance(root);
     if (instance) {
-      const alive = await isProcessAlive(instance.pid, instance.port);
+      const alive = await isProcessAlive(instance.pid, instance.port, root);
       if (alive) {
         console.log(projectUrl(instance.port, root));
         return;
@@ -137,7 +137,7 @@ async function handleStop(root: string) {
     return;
   }
   
-  const alive = await isProcessAlive(existing.pid, existing.port);
+  const alive = await isProcessAlive(existing.pid, existing.port, root);
   
   if (alive) {
     try {

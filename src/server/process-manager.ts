@@ -71,7 +71,7 @@ export async function listInstances(): Promise<InstanceWithStatus[]> {
       try {
         const content = await fs.readFile(path.join(STATE_DIR, file), 'utf-8');
         const state = JSON.parse(content) as InstanceState;
-        const alive = await isProcessAlive(state.pid, state.port);
+        const alive = await isProcessAlive(state.pid, state.port, state.root);
         instances.push({
           ...state,
           id: file.replace('.json', ''),
@@ -88,14 +88,27 @@ export async function listInstances(): Promise<InstanceWithStatus[]> {
   }
 }
 
-export async function isProcessAlive(pid: number, port: number): Promise<boolean> {
+interface HealthPayload {
+  status?: string;
+  root?: string;
+}
+
+export async function isProcessAlive(pid: number, port: number, expectedRoot?: string): Promise<boolean> {
   // Health check is the authoritative signal. In Codex sandboxed runs,
   // process.kill(pid, 0) can fail even when a localhost server is reachable.
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/health`, { 
+    const response = await fetch(`http://127.0.0.1:${port}/api/health`, {
       signal: AbortSignal.timeout(2000) 
     });
     if (!response.ok) return false;
+
+    const health = await response.json() as HealthPayload;
+    if (health.status !== 'ok') return false;
+
+    if (expectedRoot !== undefined) {
+      if (!health.root) return false;
+      if (path.resolve(health.root) !== path.resolve(expectedRoot)) return false;
+    }
   } catch {
     return false;
   }

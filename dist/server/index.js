@@ -45,7 +45,7 @@ async function handleStart(root, port) {
     // Check if instance already exists for this root
     const existing = await getInstance(root);
     if (existing) {
-        const alive = await isProcessAlive(existing.pid, existing.port);
+        const alive = await isProcessAlive(existing.pid, existing.port, root);
         if (alive) {
             console.log(`Preview server already running for ${root}`);
             console.log(`URL: ${projectUrl(existing.port, root)}`);
@@ -66,7 +66,7 @@ async function handleStart(root, port) {
 async function handleUrl(root, port) {
     const existing = await getInstance(root);
     if (existing) {
-        const alive = await isProcessAlive(existing.pid, existing.port);
+        const alive = await isProcessAlive(existing.pid, existing.port, root);
         if (alive) {
             console.log(projectUrl(existing.port, root));
             return;
@@ -84,7 +84,7 @@ async function handleUrl(root, port) {
     while (Date.now() < deadline) {
         const instance = await getInstance(root);
         if (instance) {
-            const alive = await isProcessAlive(instance.pid, instance.port);
+            const alive = await isProcessAlive(instance.pid, instance.port, root);
             if (alive) {
                 console.log(projectUrl(instance.port, root));
                 return;
@@ -115,7 +115,7 @@ async function handleStop(root) {
         console.log(`No preview server found for ${root}`);
         return;
     }
-    const alive = await isProcessAlive(existing.pid, existing.port);
+    const alive = await isProcessAlive(existing.pid, existing.port, root);
     if (alive) {
         try {
             process.kill(existing.pid, 'SIGTERM');
