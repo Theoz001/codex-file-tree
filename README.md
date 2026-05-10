@@ -41,6 +41,7 @@ manual install steps below.
 - Markdown preview/source switching
 - CodeMirror-based source preview for common text formats
 - Collapsible sidebar and system light/dark theme support
+- Running previews menu for switching between active Project Preview roots
 - Guarded write mode for editing existing text files
 - Context-menu file actions for copying paths, renaming, moving items to folders,
   and moving items to trash
@@ -110,6 +111,7 @@ Read APIs:
 
 - `GET /api/health`
 - `GET /api/meta`
+- `GET /api/previews`
 - `GET /api/tree?path=...`
 - `GET /api/folders`
 - `GET /api/file?path=...`

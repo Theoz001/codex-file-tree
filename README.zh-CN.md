@@ -38,6 +38,7 @@ Open Project Preview for this workspace.
 - Markdown 预览和源码切换
 - 使用 CodeMirror 预览常见文本格式
 - 可折叠侧边栏，并跟随系统明暗主题
+- 正在运行的预览列表，可在多个 Project Preview 项目间切换
 - 受保护的 Write mode，可编辑已有文本文件
 - 右键菜单支持复制路径、重命名、移动到项目内文件夹、移入废纸篓
 - 本地服务只绑定 `127.0.0.1`
@@ -96,6 +97,7 @@ http://127.0.0.1:8098/p/my-project/
 
 - `GET /api/health`
 - `GET /api/meta`
+- `GET /api/previews`
 - `GET /api/tree?path=...`
 - `GET /api/folders`
 - `GET /api/file?path=...`

@@ -827,6 +827,55 @@ describe('Meta API', () => {
   });
 });
 
+describe('Previews API', () => {
+  it('should list the current preview and other live preview servers', async () => {
+    const previousStateDir = process.env.PROJECT_PREVIEW_STATE_DIR;
+    const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'project-preview-state-'));
+    const otherRoot = path.join(os.tmpdir(), '新业态治理国际比较');
+    process.env.PROJECT_PREVIEW_STATE_DIR = stateDir;
+
+    try {
+      await saveInstance(otherRoot, 8101, 999999);
+      vi.stubGlobal('fetch', vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: 'ok', root: otherRoot }),
+      })));
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/previews',
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = JSON.parse(response.payload);
+      expect(data.previews).toEqual([
+        expect.objectContaining({
+          name: path.basename(testDir),
+          root: testDir,
+          port: 0,
+          url: projectUrl(0, testDir),
+          current: true,
+        }),
+        expect.objectContaining({
+          name: path.basename(otherRoot),
+          root: otherRoot,
+          port: 8101,
+          url: projectUrl(8101, otherRoot),
+          current: false,
+        }),
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+      await fs.rm(stateDir, { recursive: true, force: true });
+      if (previousStateDir === undefined) {
+        delete process.env.PROJECT_PREVIEW_STATE_DIR;
+      } else {
+        process.env.PROJECT_PREVIEW_STATE_DIR = previousStateDir;
+      }
+    }
+  });
+});
+
 describe('SPA Routes', () => {
   it('should serve index.html for non-API routes', async () => {
     const response = await app.inject({

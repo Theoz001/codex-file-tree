@@ -57,24 +57,31 @@ export async function listInstances() {
         await ensureStateDir();
         const stateDir = getStateDir();
         const files = await fs.readdir(stateDir);
-        const instances = [];
-        for (const file of files) {
-            if (!file.endsWith('.json'))
-                continue;
+        const stateEntries = await Promise.all(files
+            .filter(file => file.endsWith('.json'))
+            .map(async (file) => {
             try {
                 const content = await fs.readFile(path.join(stateDir, file), 'utf-8');
                 const state = JSON.parse(content);
-                const alive = await isProcessAlive(state.pid, state.port, state.root);
-                instances.push({
-                    ...state,
-                    id: file.replace('.json', ''),
-                    alive,
-                });
+                return {
+                    file,
+                    state,
+                };
             }
             catch {
-                // Skip invalid state files
+                return null;
             }
-        }
+        }));
+        const instances = await Promise.all(stateEntries
+            .filter((entry) => entry !== null)
+            .map(async ({ file, state }) => {
+            const alive = await isProcessAlive(state.pid, state.port, state.root);
+            return {
+                ...state,
+                id: file.replace('.json', ''),
+                alive,
+            };
+        }));
         return instances;
     }
     catch {

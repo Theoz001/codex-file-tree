@@ -250,14 +250,143 @@ input {
   border-color: var(--border-strong);
 }
 
+.previews-menu {
+  position: relative;
+}
+
+.previews-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(440px, calc(100vh - 72px));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-raised);
+  box-shadow: 0 14px 36px var(--shadow);
+  overflow: hidden;
+  z-index: 60;
+}
+
+.previews-popover-header {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.previews-refresh {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.previews-refresh:hover {
+  color: var(--text);
+  background: var(--hover);
+  border-color: var(--border);
+}
+
+.previews-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.previews-list {
+  padding: 4px;
+  overflow: auto;
+}
+
+.previews-status {
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.previews-error {
+  color: var(--danger);
+}
+
+.preview-link {
+  min-height: 54px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.preview-link:hover {
+  background: var(--hover);
+}
+
+.preview-link.current {
+  background: var(--selected);
+  color: var(--selected-text);
+}
+
+.preview-link-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.preview-link-name,
+.preview-link-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-link-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.preview-link-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.preview-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent), var(--border) 45%);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+}
+
 .btn:focus-visible,
 .icon-btn:focus-visible,
 .mode-toggle:focus-visible,
+.previews-refresh:focus-visible,
 .sidebar-collapse-btn:focus-visible,
 .sidebar-rail:focus-visible,
 .rename-dialog input:focus-visible,
 .move-dialog input:focus-visible,
 .folder-option:focus-visible,
+.preview-link:focus-visible,
 .context-menu button:focus-visible,
 .action-menu-popover button:focus-visible {
   outline: 2px solid var(--accent);

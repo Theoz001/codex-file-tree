@@ -27,6 +27,22 @@ async function renderIndexHtml(staticRoot: string, rootDir: string): Promise<str
   return html.replace(/<title>.*?<\/title>/i, `<title>${escapeHtml(title)}</title>`);
 }
 
+function createPreviewSummary(root: string, port: number, current: boolean, startedAt: string | null) {
+  return {
+    name: path.basename(root) || root,
+    root,
+    port,
+    url: projectUrl(port, root),
+    current,
+    startedAt,
+  };
+}
+
+function startedAtTime(value: string | null): number {
+  const time = value ? Date.parse(value) : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
 export function getRequestedProjectSlug(url: string): string | null {
   const pathname = url.split(/[?#]/, 1)[0] || '/';
   const match = /^\/p\/([^/?#]+)/.exec(pathname);
@@ -80,6 +96,34 @@ export async function createServer(rootDir: string, port: number, clientDist?: s
       port,
       writeToken,
     };
+  });
+
+  app.get('/api/previews', async () => {
+    const currentRoot = path.resolve(rootDir);
+    const seenRoots = new Set<string>();
+    const previews = (await listInstances())
+      .filter(instance => instance.alive)
+      .map(instance => {
+        const resolvedRoot = path.resolve(instance.root);
+        seenRoots.add(resolvedRoot);
+        return createPreviewSummary(
+          instance.root,
+          instance.port,
+          resolvedRoot === currentRoot,
+          instance.startedAt,
+        );
+      });
+
+    if (!seenRoots.has(currentRoot)) {
+      previews.push(createPreviewSummary(rootDir, port, true, null));
+    }
+
+    previews.sort((a, b) => {
+      if (a.current !== b.current) return a.current ? -1 : 1;
+      return startedAtTime(b.startedAt) - startedAtTime(a.startedAt);
+    });
+
+    return { previews };
   });
   
   // Register API routes

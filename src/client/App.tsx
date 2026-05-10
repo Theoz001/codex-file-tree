@@ -30,6 +30,15 @@ interface ProjectMeta {
   writeToken: string;
 }
 
+interface PreviewInstance {
+  name: string;
+  root: string;
+  port: number;
+  url: string;
+  current: boolean;
+  startedAt: string | null;
+}
+
 interface RenameTarget {
   path: string;
   name: string;
@@ -91,6 +100,10 @@ const App: React.FC = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [treeData, setTreeData] = useState<FileNode[]>([]);
   const [projectMeta, setProjectMeta] = useState<ProjectMeta | null>(null);
+  const [previews, setPreviews] = useState<PreviewInstance[]>([]);
+  const [previewsOpen, setPreviewsOpen] = useState(false);
+  const [previewsLoading, setPreviewsLoading] = useState(false);
+  const [previewsError, setPreviewsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [writeMode, setWriteMode] = useState(() => {
     return localStorage.getItem('writeMode') === 'true';
@@ -116,6 +129,7 @@ const App: React.FC = () => {
   const [isMoving, setIsMoving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
+  const previewsMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const moveSearchRef = useRef<HTMLInputElement>(null);
 
@@ -173,6 +187,24 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const fetchPreviews = useCallback(async () => {
+    setPreviewsLoading(true);
+    setPreviewsError(null);
+    try {
+      const response = await fetch('/api/previews');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json() as { previews: PreviewInstance[] };
+      setPreviews(data.previews || []);
+    } catch (err) {
+      setPreviewsError('Failed to load running previews');
+      console.error(err);
+    } finally {
+      setPreviewsLoading(false);
+    }
+  }, []);
+
   const fetchTree = useCallback(async (path: string = '') => {
     try {
       const response = await fetch(`/api/tree?path=${encodeURIComponent(path)}`);
@@ -207,6 +239,34 @@ const App: React.FC = () => {
     fetchMeta();
     fetchTree();
   }, [fetchMeta, fetchTree]);
+
+  useEffect(() => {
+    if (!previewsOpen) return;
+    void fetchPreviews();
+  }, [fetchPreviews, previewsOpen]);
+
+  useEffect(() => {
+    if (!previewsOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!previewsMenuRef.current?.contains(event.target as Node)) {
+        setPreviewsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPreviewsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [previewsOpen]);
 
   useEffect(() => {
     if (isDragging) {
@@ -515,6 +575,61 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="header-right">
+          <div className="previews-menu" ref={previewsMenuRef}>
+            <button
+              className={`icon-btn ${previewsOpen ? 'active' : ''}`}
+              type="button"
+              title="Running previews"
+              aria-label="Running previews"
+              aria-expanded={previewsOpen}
+              onClick={() => setPreviewsOpen(open => !open)}
+            >
+              ▦
+            </button>
+            {previewsOpen && (
+              <div className="previews-popover" role="menu" aria-label="Running previews">
+                <div className="previews-popover-header">
+                  <span>Running previews</span>
+                  <button
+                    className="previews-refresh"
+                    type="button"
+                    aria-label="Refresh running previews"
+                    title="Refresh"
+                    disabled={previewsLoading}
+                    onClick={() => void fetchPreviews()}
+                  >
+                    ↻
+                  </button>
+                </div>
+                <div className="previews-list">
+                  {previewsLoading && <div className="previews-status">Loading...</div>}
+                  {!previewsLoading && previewsError && (
+                    <div className="previews-status previews-error">{previewsError}</div>
+                  )}
+                  {!previewsLoading && !previewsError && previews.length === 0 && (
+                    <div className="previews-status">No running previews</div>
+                  )}
+                  {!previewsLoading && !previewsError && previews.map(preview => (
+                    <a
+                      key={`${preview.port}:${preview.root}`}
+                      className={`preview-link ${preview.current ? 'current' : ''}`}
+                      href={preview.url}
+                      role="menuitem"
+                      title={preview.root}
+                    >
+                      <span className="preview-link-main">
+                        <span className="preview-link-name">{preview.name}</span>
+                        {preview.current && <span className="preview-badge">Current</span>}
+                      </span>
+                      <span className="preview-link-meta">
+                        localhost:{preview.port} · {preview.root}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <button
             className={`mode-toggle ${writeMode ? 'active' : ''}`}
             type="button"

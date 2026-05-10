@@ -78,23 +78,31 @@ export async function listInstances(): Promise<InstanceWithStatus[]> {
     await ensureStateDir();
     const stateDir = getStateDir();
     const files = await fs.readdir(stateDir);
-    const instances: InstanceWithStatus[] = [];
+    const stateEntries = await Promise.all(files
+      .filter(file => file.endsWith('.json'))
+      .map(async file => {
+        try {
+          const content = await fs.readFile(path.join(stateDir, file), 'utf-8');
+          const state = JSON.parse(content) as InstanceState;
+          return {
+            file,
+            state,
+          };
+        } catch {
+          return null;
+        }
+      }));
     
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      try {
-        const content = await fs.readFile(path.join(stateDir, file), 'utf-8');
-        const state = JSON.parse(content) as InstanceState;
+    const instances = await Promise.all(stateEntries
+      .filter((entry): entry is { file: string; state: InstanceState } => entry !== null)
+      .map(async ({ file, state }) => {
         const alive = await isProcessAlive(state.pid, state.port, state.root);
-        instances.push({
+        return {
           ...state,
           id: file.replace('.json', ''),
           alive,
-        });
-      } catch {
-        // Skip invalid state files
-      }
-    }
+        };
+      }));
     
     return instances;
   } catch {
