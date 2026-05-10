@@ -94,7 +94,7 @@ project-preview list
 The server returns a local URL such as:
 
 ```text
-http://127.0.0.1:8098/p/my-project/
+http://127.0.0.1:8098/
 ```
 
 ## Safety

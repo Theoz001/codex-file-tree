@@ -17,10 +17,10 @@ describe('process manager', () => {
     expect(projectSlug('/tmp/My Project')).toBe('My-Project');
     expect(projectSlug('/tmp/project%20name')).toBe('project-20name');
     expect(projectUrl(8101, '/tmp/新业态治理国际比较')).toBe(
-      'http://127.0.0.1:8101/p/新业态治理国际比较/',
+      'http://127.0.0.1:8101/',
     );
     expect(projectRedirectUrl(8101, '/tmp/新业态治理国际比较')).toBe(
-      `http://127.0.0.1:8101/p/${encodeURIComponent('新业态治理国际比较')}/`,
+      'http://127.0.0.1:8101/',
     );
   });
 

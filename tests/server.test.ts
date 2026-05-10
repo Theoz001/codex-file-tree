@@ -925,6 +925,16 @@ describe('SPA Routes', () => {
     }
   });
 
+  it('should redirect current legacy project URLs to the clean root URL', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/p/${encodeURIComponent(path.basename(testDir))}/`,
+    });
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe(projectUrl(0, testDir));
+  });
+
   it('should serve built static assets before SPA fallback', async () => {
     const response = await app.inject({
       method: 'GET',

@@ -89,7 +89,7 @@ project-preview list
 服务会返回类似这样的本地地址：
 
 ```text
-http://127.0.0.1:8098/p/my-project/
+http://127.0.0.1:8098/
 ```
 
 ## 安全边界

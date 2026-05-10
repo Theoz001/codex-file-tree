@@ -61,7 +61,11 @@ export async function resolveProjectRedirect(
   port: number,
 ): Promise<string | null> {
   const requestedSlug = getRequestedProjectSlug(requestUrl);
-  if (!requestedSlug || requestedSlug === projectSlug(rootDir)) return null;
+  if (!requestedSlug) return null;
+
+  if (requestedSlug === projectSlug(rootDir)) {
+    return projectRedirectUrl(port, rootDir);
+  }
 
   const matches = (await listInstances())
     .filter(instance => (

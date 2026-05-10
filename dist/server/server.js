@@ -50,8 +50,11 @@ export function getRequestedProjectSlug(url) {
 }
 export async function resolveProjectRedirect(requestUrl, rootDir, port) {
     const requestedSlug = getRequestedProjectSlug(requestUrl);
-    if (!requestedSlug || requestedSlug === projectSlug(rootDir))
+    if (!requestedSlug)
         return null;
+    if (requestedSlug === projectSlug(rootDir)) {
+        return projectRedirectUrl(port, rootDir);
+    }
     const matches = (await listInstances())
         .filter(instance => (instance.alive
         && instance.port !== port

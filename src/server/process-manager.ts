@@ -26,12 +26,12 @@ export function projectSlug(root: string): string {
   return name.trim().replace(/\s+/g, '-').replace(/[/?#%\\]/g, '-') || 'root';
 }
 
-export function projectUrl(port: number, root: string): string {
-  return `http://127.0.0.1:${port}/p/${projectSlug(root)}/`;
+export function projectUrl(port: number, _root: string): string {
+  return `http://127.0.0.1:${port}/`;
 }
 
 export function projectRedirectUrl(port: number, root: string): string {
-  return `http://127.0.0.1:${port}/p/${encodeURIComponent(projectSlug(root))}/`;
+  return projectUrl(port, root);
 }
 
 function getInstanceId(root: string): string {

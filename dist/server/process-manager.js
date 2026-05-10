@@ -10,11 +10,11 @@ export function projectSlug(root) {
     const name = path.basename(root) || 'root';
     return name.trim().replace(/\s+/g, '-').replace(/[/?#%\\]/g, '-') || 'root';
 }
-export function projectUrl(port, root) {
-    return `http://127.0.0.1:${port}/p/${projectSlug(root)}/`;
+export function projectUrl(port, _root) {
+    return `http://127.0.0.1:${port}/`;
 }
 export function projectRedirectUrl(port, root) {
-    return `http://127.0.0.1:${port}/p/${encodeURIComponent(projectSlug(root))}/`;
+    return projectUrl(port, root);
 }
 function getInstanceId(root) {
     return createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 16);
