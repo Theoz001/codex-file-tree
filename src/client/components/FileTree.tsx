@@ -10,6 +10,7 @@ interface FileTreeProps {
   onCopyPath?: (node: FileNode) => void;
   onRename?: (node: FileNode) => void;
   onMove?: (node: FileNode) => void;
+  onOpenDefault?: (node: FileNode) => void;
   onTrash?: (node: FileNode) => void;
 }
 
@@ -28,6 +29,7 @@ const FileTree: React.FC<FileTreeProps> = ({
   onCopyPath,
   onRename,
   onMove,
+  onOpenDefault,
   onTrash,
 }) => {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
@@ -126,8 +128,8 @@ const FileTree: React.FC<FileTreeProps> = ({
     }
     setContextMenu({
       node,
-      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 180)),
-      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 140)),
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 220)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 190)),
     });
   };
 
@@ -194,6 +196,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                   onCopyPath={onCopyPath}
                   onRename={onRename}
                   onMove={onMove}
+                  onOpenDefault={onOpenDefault}
                   onTrash={onTrash}
                 />
               )}
@@ -220,6 +223,11 @@ const FileTree: React.FC<FileTreeProps> = ({
           {canWrite && onMove && (
             <button type="button" onClick={() => runMenuAction(() => onMove(contextMenu.node))}>
               Move to...
+            </button>
+          )}
+          {canWrite && onOpenDefault && (
+            <button type="button" onClick={() => runMenuAction(() => onOpenDefault(contextMenu.node))}>
+              Open with default app
             </button>
           )}
           {canWrite && onTrash && (

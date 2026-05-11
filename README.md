@@ -43,8 +43,8 @@ manual install steps below.
 - Collapsible sidebar and system light/dark theme support
 - Running previews menu for switching between active Project Preview roots
 - Guarded write mode for editing existing text files
-- Context-menu file actions for copying paths, renaming, moving items to folders,
-  and moving items to trash
+- Context-menu file actions for copying paths, opening items with the default
+  app, renaming, moving items to folders, and moving items to trash
 - Local-only server bound to `127.0.0.1`
 
 ## Manual Install

@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'crypto';
 import { assertExistingPathInsideRoot, assertParentInsideRoot, hasIgnoredSegment, isPathSafe, sanitizePath, MAX_FILE_SIZE, WRITE_TOKEN_HEADER, } from './security.js';
 import { getDirectoryTree, getFileInfo, getMimeType, isTextFile } from './file-utils.js';
 import { moveToTrash } from './trash.js';
+import { openWithDefaultApp as defaultOpenWithDefaultApp } from './open-default.js';
 function getHeaderValue(value) {
     return Array.isArray(value) ? value[0] || '' : value || '';
 }
@@ -104,7 +105,8 @@ function parseRangeHeader(rangeHeader, fileSize) {
         end: Math.min(end, fileSize - 1),
     };
 }
-export async function registerRoutes(fastify, rootDir, writeToken) {
+export async function registerRoutes(fastify, rootDir, writeToken, options = {}) {
+    const openWithDefaultApp = options.openWithDefaultApp ?? defaultOpenWithDefaultApp;
     // GET /api/tree?path=...
     fastify.get('/api/tree', async (request, reply) => {
         const rawPath = request.query.path || '';
@@ -421,6 +423,43 @@ export async function registerRoutes(fastify, rootDir, writeToken) {
                 return reply.status(400).send({ error: 'Only files and directories can be moved to trash' });
             }
             await moveToTrash(targetPath);
+            return reply.send({ success: true });
+        }
+        catch (err) {
+            const error = err;
+            if (isErrno(err, 'ENOENT')) {
+                return reply.status(404).send({ error: 'Path not found' });
+            }
+            if (isAccessDenied(err)) {
+                return reply.status(403).send({ error: error.message });
+            }
+            return reply.status(500).send({ error: error.message });
+        }
+    });
+    // POST /api/fs/open
+    fastify.post('/api/fs/open', async (request, reply) => {
+        if (!requireWriteToken(request, reply, writeToken)) {
+            return reply;
+        }
+        const rawPath = request.body.path || '';
+        const safePath = sanitizePath(rawPath);
+        if (!safePath) {
+            return reply.status(400).send({ error: 'Path is required' });
+        }
+        if (!isPathSafe(safePath, rootDir)) {
+            return reply.status(403).send({ error: 'Access denied: path is outside root directory' });
+        }
+        if (isProtectedWritePath(safePath)) {
+            return reply.status(403).send({ error: 'Access denied: protected path cannot be opened' });
+        }
+        const targetPath = path.join(rootDir, safePath);
+        try {
+            await assertExistingPathInsideRoot(targetPath, rootDir);
+            const stats = await fs.stat(targetPath);
+            if (!stats.isFile() && !stats.isDirectory()) {
+                return reply.status(400).send({ error: 'Only files and directories can be opened' });
+            }
+            await openWithDefaultApp(targetPath);
             return reply.send({ success: true });
         }
         catch (err) {

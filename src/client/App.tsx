@@ -544,6 +544,23 @@ const App: React.FC = () => {
     }
   }, [handleFileTrashed, projectMeta?.writeToken, writeHeaders]);
 
+  const handleOpenDefaultPath = useCallback(async (path: string) => {
+    if (!projectMeta?.writeToken) return;
+    try {
+      const response = await fetch('/api/fs/open', {
+        method: 'POST',
+        headers: writeHeaders(),
+        body: JSON.stringify({ path }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Open failed' }));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Open failed');
+    }
+  }, [projectMeta?.writeToken, writeHeaders]);
+
   const handleRenameNode = useCallback((node: FileNode) => {
     void handleRenamePath(node.path, node.name);
   }, [handleRenamePath]);
@@ -555,6 +572,10 @@ const App: React.FC = () => {
   const handleMoveNode = useCallback((node: FileNode) => {
     handleMovePath(node);
   }, [handleMovePath]);
+
+  const handleOpenDefaultNode = useCallback((node: FileNode) => {
+    void handleOpenDefaultPath(node.path);
+  }, [handleOpenDefaultPath]);
 
   const filteredTree = searchQuery
     ? treeData.filter(node =>
@@ -705,6 +726,7 @@ const App: React.FC = () => {
                   onCopyPath={handleCopyPath}
                   onRename={handleRenameNode}
                   onMove={handleMoveNode}
+                  onOpenDefault={handleOpenDefaultNode}
                   onTrash={handleTrashNode}
                 />
               </div>
@@ -724,6 +746,7 @@ const App: React.FC = () => {
             onCopyPath={handleCopyPath}
             onRename={(file) => void handleRenamePath(file.path, file.name)}
             onMove={(file) => void handleMovePath({ path: file.path, name: file.name, type: 'file' })}
+            onOpenDefault={(file) => void handleOpenDefaultPath(file.path)}
             onTrash={(file) => void handleTrashPath(file.path, file.name)}
           />
         </main>

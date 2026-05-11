@@ -79,7 +79,11 @@ export async function resolveProjectRedirect(
   return match ? projectRedirectUrl(match.port, match.root) : null;
 }
 
-export async function createServer(rootDir: string, port: number, clientDist?: string) {
+interface ServerOptions {
+  openWithDefaultApp?: (targetPath: string) => Promise<void>;
+}
+
+export async function createServer(rootDir: string, port: number, clientDist?: string, options: ServerOptions = {}) {
   const writeToken = randomBytes(32).toString('base64url');
   const app = fastify({
     logger: {
@@ -131,7 +135,9 @@ export async function createServer(rootDir: string, port: number, clientDist?: s
   });
   
   // Register API routes
-  await registerRoutes(app, rootDir, writeToken);
+  await registerRoutes(app, rootDir, writeToken, {
+    openWithDefaultApp: options.openWithDefaultApp,
+  });
 
   const staticRoot = clientDist || path.resolve(__dirname, '../client');
   const sendIndexHtml = async (reply: FastifyReply) => {

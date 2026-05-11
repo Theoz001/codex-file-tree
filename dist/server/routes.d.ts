@@ -1,3 +1,7 @@
 import { FastifyInstance } from 'fastify';
-export declare function registerRoutes(fastify: FastifyInstance, rootDir: string, writeToken: string): Promise<void>;
+interface RouteOptions {
+    openWithDefaultApp?: (targetPath: string) => Promise<void>;
+}
+export declare function registerRoutes(fastify: FastifyInstance, rootDir: string, writeToken: string, options?: RouteOptions): Promise<void>;
+export {};
 //# sourceMappingURL=routes.d.ts.map

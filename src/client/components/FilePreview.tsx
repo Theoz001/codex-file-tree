@@ -20,6 +20,7 @@ interface FilePreviewProps {
   onCopyPath: (file: FileInfo) => void;
   onRename: (file: FileInfo) => void;
   onMove: (file: FileInfo) => void;
+  onOpenDefault: (file: FileInfo) => void;
   onTrash: (file: FileInfo) => void;
 }
 
@@ -31,6 +32,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   onCopyPath,
   onRename,
   onMove,
+  onOpenDefault,
   onTrash,
 }) => {
   const [markdownSource, setMarkdownSource] = useState(false);
@@ -433,6 +435,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                     onClick={() => { setActionsOpen(false); onMove(file); }}
                   >
                     Move to...
+                  </button>
+                )}
+                {canWrite && !isEditing && (
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => { setActionsOpen(false); onOpenDefault(file); }}
+                  >
+                    Open with default app
                   </button>
                 )}
                 {canWrite && !isEditing && (

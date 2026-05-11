@@ -12,6 +12,7 @@ let outsideDir: string;
 let trashDir: string;
 let writeToken: string;
 let previousTrashDir: string | undefined;
+let openedPaths: string[];
 
 function writeHeaders() {
   return { 'x-project-preview-write-token': writeToken };
@@ -24,6 +25,7 @@ beforeAll(async () => {
   trashDir = await fs.mkdtemp(path.join(os.tmpdir(), 'project-preview-trash-'));
   previousTrashDir = process.env.PROJECT_PREVIEW_TRASH_DIR;
   process.env.PROJECT_PREVIEW_TRASH_DIR = trashDir;
+  openedPaths = [];
 
   // Create test files
   await fs.mkdir(path.join(testDir, 'subdir'), { recursive: true });
@@ -54,7 +56,11 @@ beforeAll(async () => {
   await fs.mkdir(path.join(mockClientDist, 'assets'), { recursive: true });
   await fs.writeFile(path.join(mockClientDist, 'index.html'), '<!DOCTYPE html><html><head><title>Project Preview</title></head><body>Project Preview</body></html>');
   await fs.writeFile(path.join(mockClientDist, 'assets', 'app.js'), 'console.log("asset");');
-  app = await createServer(testDir, 0, mockClientDist);
+  app = await createServer(testDir, 0, mockClientDist, {
+    openWithDefaultApp: async (targetPath) => {
+      openedPaths.push(targetPath);
+    },
+  });
 
   const metaResponse = await app.inject({
     method: 'GET',
@@ -793,6 +799,78 @@ describe('Trash API', () => {
 
     expect(response.statusCode).toBe(403);
     await expect(fs.readFile(path.join(outsideDir, 'secret.txt'), 'utf-8')).resolves.toBe('outside secret');
+  });
+});
+
+describe('Open API', () => {
+  it('should open a file with the default app', async () => {
+    openedPaths = [];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/open',
+      headers: writeHeaders(),
+      payload: { path: 'readme.md' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.payload).success).toBe(true);
+    expect(openedPaths).toEqual([path.join(testDir, 'readme.md')]);
+  });
+
+  it('should open a directory with the default app', async () => {
+    openedPaths = [];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/open',
+      headers: writeHeaders(),
+      payload: { path: 'subdir' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(openedPaths).toEqual([path.join(testDir, 'subdir')]);
+  });
+
+  it('should require a write token before opening local apps', async () => {
+    openedPaths = [];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/open',
+      payload: { path: 'readme.md' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(openedPaths).toEqual([]);
+  });
+
+  it('should reject opening protected paths', async () => {
+    openedPaths = [];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/open',
+      headers: writeHeaders(),
+      payload: { path: '.git/config' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(openedPaths).toEqual([]);
+  });
+
+  it('should reject opening through a symlinked parent directory', async () => {
+    openedPaths = [];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/fs/open',
+      headers: writeHeaders(),
+      payload: { path: 'outside-dir-link/secret.txt' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(openedPaths).toEqual([]);
   });
 });
 

@@ -14,6 +14,7 @@ import {
 } from './security.js';
 import { getDirectoryTree, getFileInfo, getMimeType, isTextFile } from './file-utils.js';
 import { moveToTrash } from './trash.js';
+import { openWithDefaultApp as defaultOpenWithDefaultApp } from './open-default.js';
 
 interface TreeQuery {
   path?: string;
@@ -42,9 +43,17 @@ interface TrashBody {
   path: string;
 }
 
+interface OpenBody {
+  path: string;
+}
+
 interface FolderInfo {
   name: string;
   path: string;
+}
+
+interface RouteOptions {
+  openWithDefaultApp?: (targetPath: string) => Promise<void>;
 }
 
 function getHeaderValue(value: string | string[] | undefined): string {
@@ -161,7 +170,14 @@ function parseRangeHeader(rangeHeader: string, fileSize: number): { start: numbe
   };
 }
 
-export async function registerRoutes(fastify: FastifyInstance, rootDir: string, writeToken: string) {
+export async function registerRoutes(
+  fastify: FastifyInstance,
+  rootDir: string,
+  writeToken: string,
+  options: RouteOptions = {},
+) {
+  const openWithDefaultApp = options.openWithDefaultApp ?? defaultOpenWithDefaultApp;
+
   // GET /api/tree?path=...
   fastify.get('/api/tree', async (request: FastifyRequest<{ Querystring: TreeQuery }>, reply: FastifyReply) => {
     const rawPath = request.query.path || '';
@@ -539,6 +555,51 @@ export async function registerRoutes(fastify: FastifyInstance, rootDir: string, 
       }
 
       await moveToTrash(targetPath);
+      return reply.send({ success: true });
+    } catch (err) {
+      const error = err as Error;
+      if (isErrno(err, 'ENOENT')) {
+        return reply.status(404).send({ error: 'Path not found' });
+      }
+      if (isAccessDenied(err)) {
+        return reply.status(403).send({ error: error.message });
+      }
+      return reply.status(500).send({ error: error.message });
+    }
+  });
+
+  // POST /api/fs/open
+  fastify.post('/api/fs/open', async (request: FastifyRequest<{ Body: OpenBody }>, reply: FastifyReply) => {
+    if (!requireWriteToken(request, reply, writeToken)) {
+      return reply;
+    }
+
+    const rawPath = request.body.path || '';
+    const safePath = sanitizePath(rawPath);
+
+    if (!safePath) {
+      return reply.status(400).send({ error: 'Path is required' });
+    }
+
+    if (!isPathSafe(safePath, rootDir)) {
+      return reply.status(403).send({ error: 'Access denied: path is outside root directory' });
+    }
+
+    if (isProtectedWritePath(safePath)) {
+      return reply.status(403).send({ error: 'Access denied: protected path cannot be opened' });
+    }
+
+    const targetPath = path.join(rootDir, safePath);
+
+    try {
+      await assertExistingPathInsideRoot(targetPath, rootDir);
+
+      const stats = await fs.stat(targetPath);
+      if (!stats.isFile() && !stats.isDirectory()) {
+        return reply.status(400).send({ error: 'Only files and directories can be opened' });
+      }
+
+      await openWithDefaultApp(targetPath);
       return reply.send({ success: true });
     } catch (err) {
       const error = err as Error;

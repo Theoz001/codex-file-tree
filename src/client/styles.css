@@ -542,7 +542,7 @@ input {
 
 .context-menu,
 .action-menu-popover {
-  min-width: 160px;
+  min-width: 190px;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 6px;
